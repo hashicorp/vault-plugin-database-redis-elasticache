@@ -113,7 +113,7 @@ func teardownTestUser(t *testing.T, r redisElastiCacheDB, username string) {
 	for i := 0; i < 20; i++ {
 		_, err := r.DeleteUser(nil, dbplugin.DeleteUserRequest{
 			Username: username,
-		}
+		})
 
 		if err == nil {
 			break
