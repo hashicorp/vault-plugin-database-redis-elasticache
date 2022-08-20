@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/hashicorp/vault-plugin-database-redis-elasticache/internal/plugin"
-
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
 
@@ -18,10 +17,7 @@ func main() {
 
 // Run starts serving the plugin
 func Run() error {
-	db, err := plugin.New()
-	if err != nil {
-		return err
-	}
-	dbplugin.Serve(db.(dbplugin.Database))
+	dbplugin.ServeMultiplex(plugin.New)
+
 	return nil
 }

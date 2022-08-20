@@ -24,7 +24,7 @@ type config struct {
 	Region   string `mapstructure:"region,omitempty"`
 }
 
-func New() (dbplugin.Database, error) {
+func New() (interface{}, error) {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Level:      hclog.Trace,
 		Output:     os.Stderr,

@@ -37,3 +37,12 @@ fmtcheck:
 .PHONY: fmt
 fmt:
 	gofumpt -l -w .
+
+.PHONY: setup-env
+setup-env:
+	cd bootstrap/terraform && terraform init && terraform apply -auto-approve
+
+
+.PHONY: teardown-env
+teardown-env:
+	cd bootstrap/terraform && terraform init && terraform destroy -auto-approve

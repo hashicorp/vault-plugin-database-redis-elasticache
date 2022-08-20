@@ -34,7 +34,8 @@ If you wish to work on this plugin, you'll first need
 
 Make sure Go is properly installed, including setting up a [GOPATH](https://golang.org/doc/code.html#GOPATH).
 
-To run the tests locally you will need to have write permissions to an [ElastiCache for Redis](https://aws.amazon.com/elasticache/redis/) instance.
+To run the tests locally you will need to have write permissions to an [ElastiCache for Redis](https://aws.amazon.com/elasticache/redis/) instance. 
+A small Terraform project is included to provision one for you if needed. More details in the [Environment Set Up](#environment-set-up) section.
 
 ## Building
 
@@ -55,6 +56,35 @@ $ make dev
 ```
 
 ## Tests
+
+### Environment Set Up
+
+To test the plugin, you need access to an Elasticache for Redis Cluster. 
+A Terraform project is included for convenience to initialize a new cluster if needed.
+If not already available, you can install Terraform by using [this documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
+
+The setup script tries to find and use available AWS credentials from the environment. You can configure AWS credentials using [this documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
+Or if you prefer you can edit the provider defined ./bootstrap/terraform/elasticache.tf with your desired set of credentials.
+
+Note that resources created via the Terraform project cost a small amount of money per hour.
+
+To set up the test cluster:
+
+```hcl
+$ make set-up-env
+...
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+```
+
+### Environment Teardown
+
+The test cluster created via the set-up-env command can be destroyed using the teardown-env command.
+
+```hcl
+$ make teardown-env
+...
+Destroy complete! Resources: 4 destroyed.
+```
 
 ### Testing Manually
 
@@ -114,9 +144,9 @@ Configure a role:
 ```sh
 $ vault write database/roles/redis-myrole \
         db_name="redis-mydb" \
-        creation_statements=$CREATION_STATEMENTS \
-        default_ttl=$DEFAULT_TTL \
-        max_ttl=$MAX_TTL
+        creation_statements="on ~* +@all" \
+        default_ttl=5m \
+        max_ttl=15m
 ...
 
 Success! Data written to: database/roles/redis-myrole
@@ -143,6 +173,28 @@ username           v_token_redis-myrole_ID_EPOCH
 To run the tests, invoke `make test`:
 
 ```sh
+$ make test
+```
+
+You can also specify a `TESTARGS` variable to filter tests like so:
+
+```sh
+$ make test TESTARGS='-run=TestConfig'
+```
+
+### Acceptance Tests
+
+The majority of tests must communicate with an existing ElastiCache instance. See the [Environment Set Up](#environment-set-up) section for instructions on how to prepare a test cluster.
+
+Some environment variables are required to run tests expecting to communicate with an ElastiCache cluster. 
+The username and password should be valid IAM access key and secret key with read and write access to the ElastiCache cluster used for testing. The URL should be the complete configuration endpoint including the port, for example: `vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379`.
+
+```sh
+$ export TEST_ELASTICACHE_USERNAME="AWS ACCESS KEY ID"
+$ export TEST_ELASTICACHE_PASSWORD="AWS SECRET ACCESS KEY"
+$ export TEST_ELASTICACHE_URL="vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379"
+$ export TEST_ELASTICACHE_REGION="us-east-1"
+
 $ make test
 ```
 
