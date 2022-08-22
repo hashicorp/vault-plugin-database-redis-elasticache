@@ -2,14 +2,15 @@ package plugin
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go/service/elasticache"
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
 
 type fields struct {
@@ -79,7 +80,6 @@ func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interfac
 		Config:           config,
 		VerifyConnection: true,
 	})
-
 	if err != nil {
 		t.Errorf("unable to pre initialize redis client for test cases: %v", err)
 	}
@@ -96,7 +96,6 @@ func setUpTestUser(t *testing.T, r *redisElastiCacheDB) string {
 		},
 		Password: "abcdefghijklmnopqrstuvwxyz",
 	})
-
 	if err != nil {
 		t.Errorf("unable to provision test user for test cases: %v", err)
 	}
