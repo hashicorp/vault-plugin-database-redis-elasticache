@@ -3,9 +3,10 @@ module github.com/hashicorp/vault-plugin-database-redis-elasticache
 go 1.17
 
 require (
+	github.com/aws/aws-sdk-go v1.44.81
 	github.com/hashicorp/go-hclog v1.2.2
-	github.com/hashicorp/vault/api v1.7.2
 	github.com/hashicorp/vault/sdk v0.5.3
+	github.com/mitchellh/mapstructure v1.5.0
 )
 
 require (
@@ -28,7 +29,6 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
