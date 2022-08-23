@@ -71,14 +71,14 @@ Note that resources created via the Terraform project cost a small amount of mon
 To set up the test cluster:
 
 ```hcl
-$ make set-up-env
+$ make setup-env
 ...
 Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 ```
 
 ### Environment Teardown
 
-The test cluster created via the set-up-env command can be destroyed using the teardown-env command.
+The test cluster created via the setup-env command can be destroyed using the teardown-env command.
 
 ```hcl
 $ make teardown-env

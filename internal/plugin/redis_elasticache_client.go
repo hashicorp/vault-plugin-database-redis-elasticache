@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -16,11 +18,23 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-var (
-	noPasswordRequired   = false
-	engine               = "Redis"
-	nonAlphanumericRegex = regexp.MustCompile("[^a-zA-Z\\d]+")
-)
+var nonAlphanumericRegex = regexp.MustCompile("[^a-zA-Z\\d]+")
+
+// Verify interface is implemented
+var _ dbplugin.Database = (*redisElastiCacheDB)(nil)
+
+type redisElastiCacheDB struct {
+	logger hclog.Logger
+	config config
+	client *elasticache.ElastiCache
+}
+
+type config struct {
+	Username string `mapstructure:"username,omitempty"`
+	Password string `mapstructure:"password,omitempty"`
+	Url      string `mapstructure:"url,omitempty"`
+	Region   string `mapstructure:"region,omitempty"`
+}
 
 func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.InitializeRequest) (dbplugin.InitializeResponse, error) {
 	r.logger.Debug("initializing AWS ElastiCache Redis client")
@@ -29,10 +43,13 @@ func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.Initiali
 		return dbplugin.InitializeResponse{}, err
 	}
 
-	sess := session.Must(session.NewSession(&aws.Config{
+	sess, err := session.NewSession(&aws.Config{
 		Region:      aws.String(r.config.Region),
 		Credentials: credentials.NewStaticCredentials(r.config.Username, r.config.Password, ""),
-	}))
+	})
+	if err != nil {
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to initialize AWS session: %w", err)
+	}
 	r.client = elasticache.New(sess)
 
 	if req.VerifyConnection {
@@ -77,8 +94,8 @@ func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequ
 
 	output, err := r.client.CreateUser(&elasticache.CreateUserInput{
 		AccessString:       &accessString,
-		Engine:             &engine,
-		NoPasswordRequired: &noPasswordRequired,
+		Engine:             aws.String("Redis"),
+		NoPasswordRequired: aws.Bool(false),
 		Passwords:          []*string{&req.Password},
 		Tags:               []*elasticache.Tag{},
 		UserId:             &userId,
