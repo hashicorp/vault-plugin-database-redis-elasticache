@@ -3,6 +3,7 @@ package rediselasticache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -158,8 +159,14 @@ func parseCreationCommands(commands []string) (string, error) {
 			return "", err
 		}
 
-		accessString += strings.Join(rules, " ")
-		accessString += " "
+		if len(rules) > 0 {
+			accessString += strings.Join(rules, " ")
+			accessString += " "
+		}
+	}
+
+	if strings.HasPrefix(accessString, "off ") || strings.Contains(accessString, " off ") || strings.HasSuffix(accessString, " off") {
+		return "", errors.New("creation of disabled or 'off' users is forbidden")
 	}
 
 	if !(strings.HasPrefix(accessString, "on ") || strings.Contains(accessString, " on ") || strings.HasSuffix(accessString, " on")) {

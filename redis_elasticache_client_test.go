@@ -423,6 +423,11 @@ func Test_parseCreationCommands(t *testing.T) {
 			want:     "on ~test* -@all +@read",
 		},
 		{
+			name:     "empty commands are tolerated",
+			commands: []string{"[\"~test*\"]", "[]", "[\"-@all\", \"+@read\"]"},
+			want:     "on ~test* -@all +@read",
+		},
+		{
 			name:     "'on' is added if missing for convenience",
 			commands: []string{"[\"~test*\"]"},
 			want:     "on ~test*",
@@ -445,6 +450,12 @@ func Test_parseCreationCommands(t *testing.T) {
 		{
 			name:     "parsing invalid command format fails",
 			commands: []string{"{\"command:\", \"on ~* +@read\"}"},
+			want:     "",
+			wantErr:  true,
+		},
+		{
+			name:     "creation of disabled users is forbidden",
+			commands: []string{"[\"~test*\", \"off\"]", "[\"+@read\"]"},
 			want:     "",
 			wantErr:  true,
 		},
