@@ -93,7 +93,7 @@ func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequ
 
 	accessString, err := parseCreationCommands(req.Statements.Commands)
 	if err != nil {
-		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to parse acess string: %w", err)
+		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to parse access string: %w", err)
 	}
 
 	userId := normaliseId(username)
