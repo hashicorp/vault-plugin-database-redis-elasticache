@@ -1,24 +1,27 @@
-package plugin
+package rediselasticache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 	"github.com/hashicorp/vault/sdk/database/helper/credsutil"
 	"github.com/mitchellh/mapstructure"
 )
 
-var nonAlphanumericRegex = regexp.MustCompile("[^a-zA-Z\\d]+")
+var (
+	nonAlphanumericHyphenRegex = regexp.MustCompile("[^a-zA-Z\\d-]+")
+	doubleHyphenRegex          = regexp.MustCompile("-{2,}")
+)
 
 // Verify interface is implemented
 var _ dbplugin.Database = (*redisElastiCacheDB)(nil)
@@ -88,18 +91,21 @@ func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequ
 		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to generate username: %w", err)
 	}
 
-	accessString := strings.Join(req.Statements.Commands[:], " ")
+	accessString, err := parseCreationCommands(req.Statements.Commands)
+	if err != nil {
+		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to parse acess string: %w", err)
+	}
 
-	userId := generateUserId(username)
+	userId := normaliseId(username)
 
 	output, err := r.client.CreateUser(&elasticache.CreateUserInput{
-		AccessString:       &accessString,
+		AccessString:       aws.String(accessString),
 		Engine:             aws.String("Redis"),
 		NoPasswordRequired: aws.Bool(false),
 		Passwords:          []*string{&req.Password},
 		Tags:               []*elasticache.Tag{},
-		UserId:             &userId,
-		UserName:           &username,
+		UserId:             aws.String(userId),
+		UserName:           aws.String(username),
 	})
 	if err != nil {
 		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to create new user: %w", err)
@@ -111,7 +117,7 @@ func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequ
 func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUserRequest) (dbplugin.UpdateUserResponse, error) {
 	r.logger.Debug("updating AWS ElastiCache Redis user", "username", req.Username)
 
-	userId := generateUserId(req.Username)
+	userId := normaliseId(req.Username)
 
 	_, err := r.client.ModifyUser(&elasticache.ModifyUserInput{
 		UserId:    &userId,
@@ -127,7 +133,7 @@ func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUs
 func (r *redisElastiCacheDB) DeleteUser(_ context.Context, req dbplugin.DeleteUserRequest) (dbplugin.DeleteUserResponse, error) {
 	r.logger.Debug("deleting AWS ElastiCache Redis user", "username", req.Username)
 
-	userId := generateUserId(req.Username)
+	userId := normaliseId(req.Username)
 
 	_, err := r.client.DeleteUser(&elasticache.DeleteUserInput{
 		UserId: &userId,
@@ -139,19 +145,50 @@ func (r *redisElastiCacheDB) DeleteUser(_ context.Context, req dbplugin.DeleteUs
 	return dbplugin.DeleteUserResponse{}, nil
 }
 
-// The ID can have up to 40 characters, and must begin with a letter.
+func parseCreationCommands(commands []string) (string, error) {
+	if len(commands) == 0 {
+		return "on ~* +@read", nil
+	}
+
+	accessString := ""
+	for _, command := range commands {
+		var rules []string
+		err := json.Unmarshal([]byte(command), &rules)
+		if err != nil {
+			return "", err
+		}
+
+		accessString += strings.Join(rules, " ")
+		accessString += " "
+	}
+
+	if !(strings.HasPrefix(accessString, "on ") || strings.Contains(accessString, " on ") || strings.HasSuffix(accessString, " on")) {
+		accessString = "on " + accessString
+	}
+
+	accessString = strings.TrimSpace(accessString)
+
+	return accessString, nil
+}
+
+// All Elasticache IDs can have up to 40 characters, and must begin with a letter.
 // It should not end with a hyphen or contain two consecutive hyphens.
 // Valid characters: A-Z, a-z, 0-9, and -(hyphen).
-func generateUserId(username string) string {
-	userId := nonAlphanumericRegex.ReplaceAllString(username, "")
+func normaliseId(raw string) string {
+	normalized := nonAlphanumericHyphenRegex.ReplaceAllString(raw, "")
+	normalized = doubleHyphenRegex.ReplaceAllString(normalized, "")
 
-	if len(userId) > 40 {
-		userId = userId[len(userId)-40:]
+	if len(normalized) > 40 {
+		normalized = normalized[len(normalized)-40:]
 	}
 
-	if unicode.IsNumber(rune(userId[0])) {
-		userId = string(rune('A'-17+userId[0])) + userId[1:]
+	if unicode.IsNumber(rune(normalized[0])) {
+		normalized = string(rune('A'-17+normalized[0])) + normalized[1:]
 	}
 
-	return userId
+	if strings.HasSuffix(normalized, "-") {
+		normalized = normalized[:len(normalized)-1] + "x"
+	}
+
+	return normalized
 }

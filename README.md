@@ -70,7 +70,7 @@ Note that resources created via the Terraform project cost a small amount of mon
 
 To set up the test cluster:
 
-```hcl
+```sh
 $ make setup-env
 ...
 Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
@@ -80,7 +80,7 @@ Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 
 The test cluster created via the setup-env command can be destroyed using the teardown-env command.
 
-```hcl
+```sh
 $ make teardown-env
 ...
 Destroy complete! Resources: 4 destroyed.
@@ -109,9 +109,7 @@ Once the server is started, register the plugin in the Vault server's [plugin ca
 
 ```sh
 $ SHA256=$(openssl dgst -sha256 $GOPATH/vault-plugin-database-redis-elasticache | cut -d ' ' -f2)
-$ vault write sys/plugins/catalog/database/vault-plugin-database-redis-elasticache \
-        command=vault-plugin-database-redis-elasticache \
-        sha256=$SHA256
+$ vault plugin register -sha256=$SHA256 database vault-plugin-database-redis-elasticache
 ...
 Success! Data written to: sys/plugins/catalog/database/vault-plugin-database-redis-elasticache
 ```
@@ -144,7 +142,7 @@ Configure a role:
 ```sh
 $ vault write database/roles/redis-myrole \
         db_name="redis-mydb" \
-        creation_statements="on ~* +@all" \
+        creation_statements='["~*", "+@read"]' \
         default_ttl=5m \
         max_ttl=15m
 ...

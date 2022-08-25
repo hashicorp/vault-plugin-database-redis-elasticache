@@ -7,13 +7,15 @@ provider "aws" {
   // region = ""
 }
 
-resource "aws_elasticache_cluster" "vault_plugin_elasticache_test" {
-  cluster_id           = "vault-plugin-elasticache-test"
-  engine               = "redis"
-  engine_version       = "6.2"
-  node_type            = "cache.t4g.micro"
-  num_cache_nodes      = 1
-  parameter_group_name = "default.redis6.x"
+resource "aws_elasticache_replication_group" "vault_plugin_elasticache_test" {
+  replication_group_id       = "vault-plugin-elasticache-test"
+  description                = "vault elasticache plugin generated test cluster"
+  engine                     = "redis"
+  engine_version             = "6.2"
+  node_type                  = "cache.t4g.micro"
+  num_cache_clusters         = 1
+  parameter_group_name       = "default.redis6.x"
+  transit_encryption_enabled = true
 
   tags = {
     "description" : "vault elasticache plugin generated test cluster"
@@ -47,7 +49,32 @@ data "aws_iam_policy_document" "vault_plugin_elasticache_test" {
       "elasticache:ModifyUser",
       "elasticache:DeleteUser",
     ]
-    resources = ["arn:aws:elasticache:*:*:user:*"]
+    resources = [
+      "arn:aws:elasticache:*:*:user:*",
+    ]
+  }
+
+  statement {
+    actions = [
+      "elasticache:DescribeUserGroups",
+      "elasticache:CreateUserGroup",
+      "elasticache:ModifyUserGroup",
+      "elasticache:DeleteUserGroup",
+      "elasticache:ModifyReplicationGroup",
+    ]
+    resources = [
+      "arn:aws:elasticache:*:*:usergroup:*",
+    ]
+  }
+
+  statement {
+    actions = [
+      "elasticache:DescribeReplicationGroups",
+      "elasticache:ModifyReplicationGroup",
+    ]
+    resources = [
+      "arn:aws:elasticache:*:*:replicationgroup:*",
+    ]
   }
 }
 
@@ -60,15 +87,15 @@ output "username" {
 // Use `terraform output password` to access the value
 output "password" {
   sensitive = true
-  value = aws_iam_access_key.vault_plugin_elasticache_test.secret
+  value     = aws_iam_access_key.vault_plugin_elasticache_test.secret
 }
 
 // export TEST_ELASTICACHE_URL=${url}
 output "url" {
   value = format(
     "%s:%s",
-    aws_elasticache_cluster.vault_plugin_elasticache_test.cache_nodes[0].address,
-    aws_elasticache_cluster.vault_plugin_elasticache_test.port)
+    aws_elasticache_replication_group.vault_plugin_elasticache_test.primary_endpoint_address,
+  aws_elasticache_replication_group.vault_plugin_elasticache_test.port)
 }
 
 // export TEST_ELASTICACHE_REGION=${region}

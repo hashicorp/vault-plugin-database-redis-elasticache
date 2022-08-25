@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashicorp/vault-plugin-database-redis-elasticache/internal/plugin"
+	"github.com/hashicorp/vault-plugin-database-redis-elasticache"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
 
@@ -17,7 +17,7 @@ func main() {
 
 // Run starts serving the plugin
 func Run() error {
-	dbplugin.ServeMultiplex(plugin.New)
+	dbplugin.ServeMultiplex(rediselasticache.New)
 
 	return nil
 }

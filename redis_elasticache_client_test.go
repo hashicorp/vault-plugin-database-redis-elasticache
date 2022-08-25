@@ -1,4 +1,4 @@
-package plugin
+package rediselasticache
 
 import (
 	"context"
@@ -92,7 +92,7 @@ func setUpTestUser(t *testing.T, r *redisElastiCacheDB) string {
 			RoleName:    "role",
 		},
 		Statements: dbplugin.Statements{
-			Commands: []string{"on ~test* -@all +@read"},
+			Commands: []string{"[\"~test*\",\"-@all\",\"+@read\"]"},
 		},
 		Password: "abcdefghijklmnopqrstuvwxyz",
 	})
@@ -194,27 +194,7 @@ func Test_redisElastiCacheDB_NewUser(t *testing.T) {
 						RoleName:    "role",
 					},
 					Statements: dbplugin.Statements{
-						Commands: []string{"on ~test* -@all +@read"},
-					},
-					Password: "abcdefghijklmnopqrstuvwxyz",
-				},
-			},
-			want: dbplugin.NewUserResponse{
-				Username: "v_displ_role_",
-			},
-		},
-		{
-			name:   "create new valid user from multiple commands",
-			fields: f,
-			args: args{
-				ctx: context.Background(),
-				req: dbplugin.NewUserRequest{
-					UsernameConfig: dbplugin.UsernameMetadata{
-						DisplayName: "display",
-						RoleName:    "role",
-					},
-					Statements: dbplugin.Statements{
-						Commands: []string{"on", "~test*", "-@all", "+@read"},
+						Commands: []string{"[\"~test*\",\"-@all\",\"+@read\"]"},
 					},
 					Password: "abcdefghijklmnopqrstuvwxyz",
 				},
@@ -234,7 +214,7 @@ func Test_redisElastiCacheDB_NewUser(t *testing.T) {
 						RoleName:    "iAmEvenLongerTheApiWillDefinitelyRejectUsIfWeArePassedAsIsWithoutAnyModifications",
 					},
 					Statements: dbplugin.Statements{
-						Commands: []string{"on ~test* -@all +@read"},
+						Commands: []string{"[\"~test*\",\"-@all\",\"+@read\"]"},
 					},
 					Password: "abcdefghijklmnopqrstuvwxyz",
 				},
@@ -254,7 +234,7 @@ func Test_redisElastiCacheDB_NewUser(t *testing.T) {
 						RoleName:    "role",
 					},
 					Statements: dbplugin.Statements{
-						Commands: []string{"+@all"},
+						Commands: []string{"[\"~test*\",\"-@all\",\"+@read\"]"},
 					},
 					Password: "too short",
 				},
@@ -418,7 +398,73 @@ func Test_redisElastiCacheDB_DeleteUser(t *testing.T) {
 	}
 }
 
-func Test_generateUserId(t *testing.T) {
+func Test_parseCreationCommands(t *testing.T) {
+	type testCases []struct {
+		name     string
+		commands []string
+		want     string
+		wantErr  bool
+	}
+
+	tests := testCases{
+		{
+			name:     "empty command returns read-only user",
+			commands: []string{},
+			want:     "on ~* +@read",
+		},
+		{
+			name:     "single command with multiple rules parses correctly",
+			commands: []string{"[\"~test*\",\"-@all\",\"+@read\"]"},
+			want:     "on ~test* -@all +@read",
+		},
+		{
+			name:     "multiple commands with multiple rules parses correctly",
+			commands: []string{"[\"~test*\"]", "[\"-@all\", \"+@read\"]"},
+			want:     "on ~test* -@all +@read",
+		},
+		{
+			name:     "'on' is added if missing for convenience",
+			commands: []string{"[\"~test*\"]"},
+			want:     "on ~test*",
+		},
+		{
+			name:     "'on' is ignored if passed at the beginning",
+			commands: []string{"[\"on\", \"~test*\"]"},
+			want:     "on ~test*",
+		},
+		{
+			name:     "'on' is ignored if passed explicitly within the rules",
+			commands: []string{"[\"~test*\", \"on\"]", "[\"+@read\"]"},
+			want:     "~test* on +@read",
+		},
+		{
+			name:     "'on' is ignored if passed explicitly at the end",
+			commands: []string{"[\"~test*\", \"on\"]"},
+			want:     "~test* on",
+		},
+		{
+			name:     "parsing invalid command format fails",
+			commands: []string{"{\"command:\", \"on ~* +@read\"}"},
+			want:     "",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseCreationCommands(tt.commands)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseCreationCommands() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseCreationCommands() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_normaliseId(t *testing.T) {
 	type args struct {
 		username string
 	}
@@ -446,7 +492,7 @@ func Test_generateUserId(t *testing.T) {
 		{
 			name: "username with non-alphanumeric characters",
 			args: args{username: "v_token_redis-role!/$}"},
-			want: "vtokenredisrole",
+			want: "vtokenredis-role",
 		},
 		{
 			name: "username starting with a number",
@@ -456,7 +502,7 @@ func Test_generateUserId(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := generateUserId(tt.args.username); got != tt.want {
+			if got := normaliseId(tt.args.username); got != tt.want {
 				t.Errorf("generateUserId() = %v, want %v", got, tt.want)
 			}
 		})

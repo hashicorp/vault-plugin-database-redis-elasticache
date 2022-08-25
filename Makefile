@@ -36,7 +36,7 @@ fmtcheck:
 
 .PHONY: fmt
 fmt:
-	gofumpt -l -w .
+	gofumpt -l -w . && cd bootstrap/terraform && terraform fmt
 
 .PHONY: setup-env
 setup-env:
