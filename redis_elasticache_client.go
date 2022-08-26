@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticache"
@@ -111,6 +113,50 @@ func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequ
 	if err != nil {
 		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to create new user: %w", err)
 	}
+	r.waitForUserActiveState(userId)
+
+	clusterId := extractClusterId(r.config.Url)
+
+	_, err = r.client.DescribeUserGroups(&elasticache.DescribeUserGroupsInput{
+		UserGroupId: aws.String(clusterId),
+	})
+	if err != nil && err.(awserr.Error).Code() == "UserGroupNotFound" {
+		r.logger.Debug("bootstrapping vault user group for cluster", "cluster id", clusterId)
+		_, err = r.client.CreateUserGroup(&elasticache.CreateUserGroupInput{
+			Engine:      aws.String("Redis"),
+			Tags:        []*elasticache.Tag{},
+			UserGroupId: aws.String(clusterId),
+			UserIds: []*string{
+				aws.String("default"), // User groups must contain a user with the username default
+				aws.String(userId),
+			},
+		})
+		if r.waitForGroupActiveState(clusterId) {
+			_, err = r.client.ModifyReplicationGroup(&elasticache.ModifyReplicationGroupInput{
+				ReplicationGroupId: aws.String(clusterId),
+				UserGroupIdsToAdd:  []*string{aws.String(clusterId)},
+			})
+		} else {
+			err = fmt.Errorf("unable to update replication group %s, newly created user group never turned active", clusterId)
+		}
+	} else {
+		if r.waitForGroupActiveState(clusterId) {
+			_, err = r.client.ModifyUserGroup(&elasticache.ModifyUserGroupInput{
+				UserGroupId:  aws.String(clusterId),
+				UserIdsToAdd: []*string{aws.String(userId)},
+			})
+		} else {
+			err = fmt.Errorf("unable to update user group %s, user group never turned active", clusterId)
+		}
+	}
+
+	if err != nil {
+		r.logger.Debug("encountered error while configuring newly created user, attempting to clean up", "user id", userId)
+		_, _ = r.DeleteUser(nil, dbplugin.DeleteUserRequest{
+			Username: userId,
+		})
+		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to configure newly created user %s: %w", userId, err)
+	}
 
 	return dbplugin.NewUserResponse{Username: *output.UserName}, nil
 }
@@ -120,15 +166,19 @@ func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUs
 
 	userId := normaliseId(req.Username)
 
-	_, err := r.client.ModifyUser(&elasticache.ModifyUserInput{
-		UserId:    &userId,
-		Passwords: []*string{&req.Password.NewPassword},
-	})
-	if err != nil {
-		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to update user: %w", err)
-	}
+	if r.waitForUserActiveState(userId) {
+		_, err := r.client.ModifyUser(&elasticache.ModifyUserInput{
+			UserId:    &userId,
+			Passwords: []*string{&req.Password.NewPassword},
+		})
+		if err != nil {
+			return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to update user %s: %w", userId, err)
+		}
 
-	return dbplugin.UpdateUserResponse{}, nil
+		return dbplugin.UpdateUserResponse{}, nil
+	} else {
+		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to update user %s, user never turned active", userId)
+	}
 }
 
 func (r *redisElastiCacheDB) DeleteUser(_ context.Context, req dbplugin.DeleteUserRequest) (dbplugin.DeleteUserResponse, error) {
@@ -136,14 +186,53 @@ func (r *redisElastiCacheDB) DeleteUser(_ context.Context, req dbplugin.DeleteUs
 
 	userId := normaliseId(req.Username)
 
-	_, err := r.client.DeleteUser(&elasticache.DeleteUserInput{
-		UserId: &userId,
-	})
-	if err != nil {
-		return dbplugin.DeleteUserResponse{}, fmt.Errorf("unable to delete user: %w", err)
+	out, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{UserId: aws.String(userId)})
+	if (err != nil && err.(awserr.Error).Code() == "UserNotFound") || (out != nil && len(out.Users) == 1 && *out.Users[0].Status == "deleting") {
+		r.logger.Debug("user does not exist or is being deleted, considering deletion successful", "user id", userId)
+		return dbplugin.DeleteUserResponse{}, nil
 	}
 
-	return dbplugin.DeleteUserResponse{}, nil
+	if r.waitForUserActiveState(userId) {
+		_, err = r.client.DeleteUser(&elasticache.DeleteUserInput{
+			UserId: &userId,
+		})
+	} else {
+		err = fmt.Errorf("unable to delete user %s, user never turned active", userId)
+	}
+
+	return dbplugin.DeleteUserResponse{}, err
+}
+
+func (r *redisElastiCacheDB) waitForGroupActiveState(userGroupId string) bool {
+	return retry(userGroupId, func(s string) bool {
+		out, err := r.client.DescribeUserGroups(&elasticache.DescribeUserGroupsInput{
+			UserGroupId: aws.String(userGroupId),
+		})
+
+		return err == nil && len(out.UserGroups) == 1 && *out.UserGroups[0].Status == "active"
+	})
+}
+
+func (r *redisElastiCacheDB) waitForUserActiveState(userId string) bool {
+	return retry(userId, func(s string) bool {
+		out, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{
+			UserId: aws.String(userId),
+		})
+
+		return err == nil && len(out.Users) == 1 && *out.Users[0].Status == "active"
+	})
+}
+
+func retry(s string, f func(string) bool) bool {
+	for i := 0; i < 50; i++ {
+		if f(s) {
+			return true
+		} else {
+			time.Sleep(3 * time.Second)
+		}
+	}
+
+	return false
 }
 
 func parseCreationCommands(commands []string) (string, error) {
@@ -176,6 +265,13 @@ func parseCreationCommands(commands []string) (string, error) {
 	accessString = strings.TrimSpace(accessString)
 
 	return accessString, nil
+}
+
+// Elasticache URLs are always in the form of prefix.cluster-id.dns-suffix:port and cluster ids nor prefix cannot contain "." characters
+func extractClusterId(url string) string {
+	_, after, _ := strings.Cut(url, ".")
+	before, _, _ := strings.Cut(after, ".")
+	return normaliseId(before)
 }
 
 // All Elasticache IDs can have up to 40 characters, and must begin with a letter.

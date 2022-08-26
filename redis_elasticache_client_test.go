@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/service/elasticache"
 	"github.com/hashicorp/go-hclog"
@@ -103,25 +102,14 @@ func setUpTestUser(t *testing.T, r *redisElastiCacheDB) string {
 	return user.Username
 }
 
-func teardownTestUser(t *testing.T, r redisElastiCacheDB, username string) {
+func teardownTestUser(r redisElastiCacheDB, username string) {
 	if username == "" {
 		return
 	}
 
-	// Creating or Modifying users cannot be deleted until they return to Active status
-	for i := 0; i < 20; i++ {
-		_, err := r.DeleteUser(nil, dbplugin.DeleteUserRequest{
-			Username: username,
-		})
-
-		if err == nil {
-			break
-		} else {
-			t.Logf("unable to clean test user '%s' due to: %v; retrying", username, err)
-		}
-
-		time.Sleep(3 * time.Second)
-	}
+	_, _ = r.DeleteUser(nil, dbplugin.DeleteUserRequest{
+		Username: username,
+	})
 }
 
 func Test_redisElastiCacheDB_Initialize(t *testing.T) {
@@ -273,7 +261,7 @@ func Test_redisElastiCacheDB_NewUser(t *testing.T) {
 				t.Errorf("NewUser() got = %v, want %v", got, tt.want)
 			}
 
-			teardownTestUser(t, r, got.Username)
+			teardownTestUser(r, got.Username)
 		})
 	}
 }
@@ -285,7 +273,7 @@ func Test_redisElastiCacheDB_UpdateUser(t *testing.T) {
 
 	setUpClient(t, &r, c)
 	username := setUpTestUser(t, &r)
-	defer teardownTestUser(t, r, username)
+	defer teardownTestUser(r, username)
 
 	tests := testCases{
 		{
@@ -372,7 +360,7 @@ func Test_redisElastiCacheDB_DeleteUser(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:   "delete non-existing user fails",
+			name:   "delete non-existing user is lenient",
 			fields: f,
 			args: args{
 				ctx: context.Background(),
@@ -380,8 +368,7 @@ func Test_redisElastiCacheDB_DeleteUser(t *testing.T) {
 					Username: "I do not exist",
 				},
 			},
-			want:    dbplugin.DeleteUserResponse{},
-			wantErr: true,
+			want: dbplugin.DeleteUserResponse{},
 		},
 	}
 	for _, tt := range tests {
