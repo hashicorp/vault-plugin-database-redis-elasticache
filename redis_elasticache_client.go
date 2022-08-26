@@ -115,43 +115,8 @@ func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequ
 	}
 	r.waitForUserActiveState(userId)
 
-	clusterId := extractClusterId(r.config.Url)
-
-	_, err = r.client.DescribeUserGroups(&elasticache.DescribeUserGroupsInput{
-		UserGroupId: aws.String(clusterId),
-	})
-	if err != nil && err.(awserr.Error).Code() == "UserGroupNotFound" {
-		r.logger.Debug("bootstrapping vault user group for cluster", "cluster id", clusterId)
-		_, err = r.client.CreateUserGroup(&elasticache.CreateUserGroupInput{
-			Engine:      aws.String("Redis"),
-			Tags:        []*elasticache.Tag{},
-			UserGroupId: aws.String(clusterId),
-			UserIds: []*string{
-				aws.String("default"), // User groups must contain a user with the username default
-				aws.String(userId),
-			},
-		})
-		if r.waitForGroupActiveState(clusterId) {
-			_, err = r.client.ModifyReplicationGroup(&elasticache.ModifyReplicationGroupInput{
-				ReplicationGroupId: aws.String(clusterId),
-				UserGroupIdsToAdd:  []*string{aws.String(clusterId)},
-			})
-		} else {
-			err = fmt.Errorf("unable to update replication group %s, newly created user group never turned active", clusterId)
-		}
-	} else {
-		if r.waitForGroupActiveState(clusterId) {
-			_, err = r.client.ModifyUserGroup(&elasticache.ModifyUserGroupInput{
-				UserGroupId:  aws.String(clusterId),
-				UserIdsToAdd: []*string{aws.String(userId)},
-			})
-		} else {
-			err = fmt.Errorf("unable to update user group %s, user group never turned active", clusterId)
-		}
-	}
-
-	if err != nil {
-		r.logger.Debug("encountered error while configuring newly created user, attempting to clean up", "user id", userId)
+	if err = r.associateUserWithReplicationGroup(userId); err != nil {
+		r.logger.Debug("encountered error while associating newly created user, attempting to clean up", "user id", userId)
 		_, _ = r.DeleteUser(nil, dbplugin.DeleteUserRequest{
 			Username: userId,
 		})
@@ -203,29 +168,117 @@ func (r *redisElastiCacheDB) DeleteUser(_ context.Context, req dbplugin.DeleteUs
 	return dbplugin.DeleteUserResponse{}, err
 }
 
+// If replication group already has an associated user group, we use it
+// If not and a default user group already exists, we associate it
+// If not and a default group does not exist, we create and associate it
+func (r *redisElastiCacheDB) associateUserWithReplicationGroup(userId string) error {
+	replicationGroupId := r.extractReplicationGroupId()
+	userGroupId, err := r.extractUserGroupId(replicationGroupId)
+	if err != nil {
+		return fmt.Errorf("unable to determine if replication group %s already has an associated user group", replicationGroupId)
+	}
+
+	if userGroupId != "" {
+		if r.waitForGroupActiveState(userGroupId) {
+			_, err = r.client.ModifyUserGroup(&elasticache.ModifyUserGroupInput{
+				UserGroupId:  aws.String(userGroupId),
+				UserIdsToAdd: []*string{aws.String(userId)},
+			})
+		} else {
+			err = fmt.Errorf("unable to update user group %s, user group never turned active", replicationGroupId)
+		}
+	} else {
+		r.logger.Debug("configuring user group for replication group", "replication group id", replicationGroupId)
+
+		_, err = r.client.DescribeUserGroups(&elasticache.DescribeUserGroupsInput{
+			UserGroupId: aws.String(replicationGroupId),
+		})
+		if err != nil && err.(awserr.Error).Code() == "UserGroupNotFound" {
+			_, err = r.client.CreateUserGroup(&elasticache.CreateUserGroupInput{
+				Engine:      aws.String("Redis"),
+				Tags:        []*elasticache.Tag{},
+				UserGroupId: aws.String(replicationGroupId),
+				UserIds: []*string{
+					aws.String("default"), // User groups must contain a user with the username default
+					aws.String(userId),
+				},
+			})
+		}
+
+		if r.waitForGroupActiveState(replicationGroupId) {
+			_, err = r.client.ModifyReplicationGroup(&elasticache.ModifyReplicationGroupInput{
+				ReplicationGroupId: aws.String(replicationGroupId),
+				UserGroupIdsToAdd:  []*string{aws.String(replicationGroupId)},
+			})
+		} else {
+			err = fmt.Errorf("unable to update replication group %s, newly created user group never turned active", replicationGroupId)
+		}
+	}
+
+	return err
+}
+
+// Replication groups can have none or up to 1 associated user group at any given time
+func (r *redisElastiCacheDB) extractUserGroupId(replicationGroupId string) (string, error) {
+	out, err := r.client.DescribeReplicationGroups(&elasticache.DescribeReplicationGroupsInput{
+		ReplicationGroupId: aws.String(replicationGroupId),
+	})
+
+	userGroupId := ""
+	if err == nil && len(out.ReplicationGroups) == 1 && len(out.ReplicationGroups[0].UserGroupIds) == 1 {
+		userGroupId = *out.ReplicationGroups[0].UserGroupIds[0]
+	}
+
+	return userGroupId, err
+}
+
+// Elasticache URLs are always in the form of prefix.cluster-id.dns-suffix:port and cluster ids nor prefix cannot contain "." characters
+func (r *redisElastiCacheDB) extractReplicationGroupId() string {
+	_, after, found := strings.Cut(r.config.Url, ".")
+	if found {
+		before, _, found := strings.Cut(after, ".")
+		if found {
+			return normaliseId(before)
+		}
+	}
+
+	return ""
+}
+
 func (r *redisElastiCacheDB) waitForGroupActiveState(userGroupId string) bool {
-	return retry(userGroupId, func(s string) bool {
+	return retry(userGroupId, func(s string) (bool, error) {
 		out, err := r.client.DescribeUserGroups(&elasticache.DescribeUserGroupsInput{
 			UserGroupId: aws.String(userGroupId),
 		})
 
-		return err == nil && len(out.UserGroups) == 1 && *out.UserGroups[0].Status == "active"
+		if err != nil {
+			return false, err
+		} else {
+			return len(out.UserGroups) == 1 && *out.UserGroups[0].Status == "active", nil
+		}
 	})
 }
 
 func (r *redisElastiCacheDB) waitForUserActiveState(userId string) bool {
-	return retry(userId, func(s string) bool {
+	return retry(userId, func(s string) (bool, error) {
 		out, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{
 			UserId: aws.String(userId),
 		})
 
-		return err == nil && len(out.Users) == 1 && *out.Users[0].Status == "active"
+		if err != nil {
+			return false, err
+		} else {
+			return len(out.Users) == 1 && *out.Users[0].Status == "active", nil
+		}
 	})
 }
 
-func retry(s string, f func(string) bool) bool {
+func retry(s string, f func(string) (bool, error)) bool {
 	for i := 0; i < 50; i++ {
-		if f(s) {
+		ok, err := f(s)
+		if err != nil {
+			return false
+		} else if ok {
 			return true
 		} else {
 			time.Sleep(3 * time.Second)
@@ -265,13 +318,6 @@ func parseCreationCommands(commands []string) (string, error) {
 	accessString = strings.TrimSpace(accessString)
 
 	return accessString, nil
-}
-
-// Elasticache URLs are always in the form of prefix.cluster-id.dns-suffix:port and cluster ids nor prefix cannot contain "." characters
-func extractClusterId(url string) string {
-	_, after, _ := strings.Cut(url, ".")
-	before, _, _ := strings.Cut(after, ".")
-	return normaliseId(before)
 }
 
 // All Elasticache IDs can have up to 40 characters, and must begin with a letter.
