@@ -2,26 +2,16 @@ package rediselasticache
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"regexp"
-	"strings"
-	"unicode"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticache"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-secure-stdlib/awsutil"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
-	"github.com/hashicorp/vault/sdk/database/helper/credsutil"
 	"github.com/mitchellh/mapstructure"
-)
-
-var (
-	nonAlphanumericHyphenRegex = regexp.MustCompile("[^a-zA-Z\\d-]+")
-	doubleHyphenRegex          = regexp.MustCompile("-{2,}")
 )
 
 // Verify interface is implemented
@@ -47,9 +37,19 @@ func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.Initiali
 		return dbplugin.InitializeResponse{}, err
 	}
 
+	creds, err := awsutil.RetrieveCreds(r.config.Username, r.config.Password, "", r.logger)
+	if err != nil {
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to rerieve AWS credentials from provider chain: %w", err)
+	}
+
+	region, err := awsutil.GetRegion(r.config.Region)
+	if err != nil {
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region from config nor context: %w", err)
+	}
+
 	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(r.config.Region),
-		Credentials: credentials.NewStaticCredentials(r.config.Username, r.config.Password, ""),
+		Region:      aws.String(region),
+		Credentials: creds,
 	})
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to initialize AWS session: %w", err)
@@ -78,124 +78,52 @@ func (r *redisElastiCacheDB) Close() error {
 	return nil
 }
 
-func (r *redisElastiCacheDB) NewUser(_ context.Context, req dbplugin.NewUserRequest) (dbplugin.NewUserResponse, error) {
-	r.logger.Debug("creating new AWS ElastiCache Redis user", "role", req.UsernameConfig.RoleName)
+func (r *redisElastiCacheDB) NewUser(_ context.Context, _ dbplugin.NewUserRequest) (dbplugin.NewUserResponse, error) {
+	return dbplugin.NewUserResponse{}, fmt.Errorf("user creation not supported")
+}
 
-	// Format: v_{displayName}_{roleName}_{ID[20]}_{epoch[11]}
-	// Length limits set so unique identifiers are not truncated
-	username, err := credsutil.GenerateUsername(
-		credsutil.DisplayName(req.UsernameConfig.DisplayName, 5),
-		credsutil.RoleName(req.UsernameConfig.RoleName, 39),
-		credsutil.MaxLength(80),
-	)
-	if err != nil {
-		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to generate username: %w", err)
-	}
-
-	accessString, err := parseCreationCommands(req.Statements.Commands)
-	if err != nil {
-		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to parse access string: %w", err)
-	}
-
-	userId := normaliseId(username)
-
-	output, err := r.client.CreateUser(&elasticache.CreateUserInput{
-		AccessString:       aws.String(accessString),
-		Engine:             aws.String("Redis"),
-		NoPasswordRequired: aws.Bool(false),
-		Passwords:          []*string{&req.Password},
-		Tags:               []*elasticache.Tag{},
-		UserId:             aws.String(userId),
-		UserName:           aws.String(username),
-	})
-	if err != nil {
-		return dbplugin.NewUserResponse{}, fmt.Errorf("unable to create new user: %w", err)
-	}
-
-	return dbplugin.NewUserResponse{Username: *output.UserName}, nil
+func (r *redisElastiCacheDB) DeleteUser(_ context.Context, _ dbplugin.DeleteUserRequest) (dbplugin.DeleteUserResponse, error) {
+	return dbplugin.DeleteUserResponse{}, fmt.Errorf("user deletion not supported")
 }
 
 func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUserRequest) (dbplugin.UpdateUserResponse, error) {
 	r.logger.Debug("updating AWS ElastiCache Redis user", "username", req.Username)
 
-	userId := normaliseId(req.Username)
+	out, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{
+		UserId: aws.String(req.Username),
+	})
+	if err != nil {
+		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to get user %s: %w", req.Username, err)
+	}
+	if len(out.Users) == 1 && *out.Users[0].Status != "active" {
+		return dbplugin.UpdateUserResponse{}, fmt.Errorf("user %s cannot be updated because it is not in the 'active' state", req.Username)
+	}
 
-	_, err := r.client.ModifyUser(&elasticache.ModifyUserInput{
-		UserId:    &userId,
+	_, err = r.client.ModifyUser(&elasticache.ModifyUserInput{
+		UserId:    &req.Username,
 		Passwords: []*string{&req.Password.NewPassword},
 	})
 	if err != nil {
-		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to update user: %w", err)
+		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to update user %s: %w", req.Username, err)
 	}
 
 	return dbplugin.UpdateUserResponse{}, nil
 }
 
-func (r *redisElastiCacheDB) DeleteUser(_ context.Context, req dbplugin.DeleteUserRequest) (dbplugin.DeleteUserResponse, error) {
-	r.logger.Debug("deleting AWS ElastiCache Redis user", "username", req.Username)
+func (r *redisElastiCacheDB) waitForUserActiveState(userId string) bool {
+	isActive := false
 
-	userId := normaliseId(req.Username)
-
-	_, err := r.client.DeleteUser(&elasticache.DeleteUserInput{
-		UserId: &userId,
-	})
-	if err != nil {
-		return dbplugin.DeleteUserResponse{}, fmt.Errorf("unable to delete user: %w", err)
-	}
-
-	return dbplugin.DeleteUserResponse{}, nil
-}
-
-func parseCreationCommands(commands []string) (string, error) {
-	if len(commands) == 0 {
-		return "on ~* +@read", nil
-	}
-
-	accessString := ""
-	for _, command := range commands {
-		var rules []string
-		err := json.Unmarshal([]byte(command), &rules)
-		if err != nil {
-			return "", err
-		}
-
-		if len(rules) > 0 {
-			accessString += strings.Join(rules, " ")
-			accessString += " "
+	for i := 0; i <= 50; i++ {
+		user, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{
+			UserId: aws.String(userId),
+		})
+		if err != nil && len(user.Users) == 1 && *user.Users[0].Status == "active" {
+			isActive = true
+			break
+		} else {
+			time.Sleep(3 * time.Second)
 		}
 	}
 
-	if strings.HasPrefix(accessString, "off ") || strings.Contains(accessString, " off ") || strings.HasSuffix(accessString, " off") {
-		return "", errors.New("creation of disabled or 'off' users is forbidden")
-	}
-
-	if !(strings.HasPrefix(accessString, "on ") || strings.Contains(accessString, " on ") || strings.HasSuffix(accessString, " on")) {
-		accessString = "on " + accessString
-	}
-
-	accessString = strings.TrimSpace(accessString)
-
-	return accessString, nil
-}
-
-// All Elasticache IDs can have up to 40 characters, and must begin with a letter.
-// It should not end with a hyphen or contain two consecutive hyphens.
-// Valid characters: A-Z, a-z, 0-9, and -(hyphen).
-func normaliseId(raw string) string {
-	normalized := nonAlphanumericHyphenRegex.ReplaceAllString(raw, "")
-	normalized = doubleHyphenRegex.ReplaceAllString(normalized, "")
-
-	if len(normalized) > 40 {
-		normalized = normalized[len(normalized)-40:]
-	}
-
-	if unicode.IsNumber(rune(normalized[0])) {
-		normalized = string(rune('A'-17+normalized[0])) + normalized[1:]
-	}
-
-	if strings.HasSuffix(normalized, "-") {
-		normalized = normalized[:len(normalized)-1] + "x"
-	}
-
-	return normalized
+	return isActive
 }
