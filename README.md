@@ -137,32 +137,29 @@ $ vault write database/config/redis-mydb \
 Success! Data written to: database/config/redis-mydb
 ```
 
-Configure a role:
+Configure a static role:
 
 ```sh
-$ vault write database/roles/redis-myrole \
+$ vault write database/static-roles/redis-myrole \
         db_name="redis-mydb" \
-        creation_statements='["~*", "+@read"]' \
-        default_ttl=5m \
-        max_ttl=15m
+        username="my-elasticache-username" \
+        rotation_period=5m
 ...
 
 Success! Data written to: database/roles/redis-myrole
 ```
 
-And generate your first set of dynamic credentials:
+Retrieve your first set of static credentials:
 
 ```sh
-$ vault read database/creds/redis-myrole
-...
-
-Key                Value
----                -----
-lease_id           database/creds/redis-myrole/ID
-lease_duration     Xm
-lease_renewable    true
-password           PASSWORD
-username           v_token_redis-myrole_ID_EPOCH
+$ vault read database/static-creds/redis-myrole
+Key                    Value
+---                    -----
+last_vault_rotation    2022-09-06T12:15:33.958413491-04:00
+password               PASSWORD
+rotation_period        5m
+ttl                    4m55s
+username               my-elasticache-username
 ```
 
 
