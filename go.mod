@@ -3,7 +3,7 @@ module github.com/hashicorp/vault-plugin-scaffolding
 go 1.17
 
 require (
-	github.com/hashicorp/go-hclog v1.2.2
+	github.com/hashicorp/go-hclog v1.3.0
 	github.com/hashicorp/vault/api v1.7.2
 	github.com/hashicorp/vault/sdk v0.5.3
 )
