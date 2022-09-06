@@ -1,61 +1,21 @@
-# Vault Plugin Scaffolding
+# Vault Plugin Database Redis ElastiCache
 
-This is a standalone backend plugin for use with [Hashicorp
+This is a standalone [Database Plugin](https://www.vaultproject.io/docs/secrets/databases) for use with [Hashicorp
 Vault](https://www.github.com/hashicorp/vault).
 
-[//]: <> (Include a general statement about this plugin)
+This plugin supports exclusively AWS ElastiCache for Redis. [Redis Enterprise](https://github.com/RedisLabs/vault-plugin-database-redis-enterprise) 
+and [Redis Open Source](https://github.com/fhitchen/vault-plugin-database-redis) use different plugins.
 
 Please note: We take Vault's security and our users' trust very seriously. If
 you believe you have found a security issue in Vault, please responsibly
 disclose by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
-## Using this Template Repository
-
-_Note: Remove this instruction sub-heading once you've created a repository from this template_
-
-This repository is a template for a Vault secret engine and auth method plugins.
-It is intended as a starting point for creating Vault plugins, containing:
-
-- Changelog, readme, Makefile, pull request template
-- Scripts for internal tooling
-- Jira sync and basic testing GitHub actions
-- A base `main.go` for compiling the plugin
-
-There's some minimal GitHub Secrets setup required in order to get the Jira sync
-GH action working. Install the `gh` [CLI](https://cli.github.com/manual/) and
-perform the following commands to set secrets for this repository.
-
-```sh
-gh secret set JIRA_SYNC_BASE_URL 
-gh secret set JIRA_SYNC_USER_EMAIL 
-gh secret set JIRA_SYNC_API_TOKEN
-```
-
-
-This template repository does not include a Mozilla Public License 2.0 `LICENSE`
-since plugins created this way can be internal to hashicorp and for Vault
-Enterprise consumption. To add a license, follow [these GitHub
-instructions](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository),
-or obtain one from one of our public Vault plugins.
-
-Please see the [GitHub template repository
-documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template)
-for how to create a new repository from this template on GitHub.
-
-Things _not_ handled by this template repository:
-- Repository settings, such as branch protection rules
-- Memberships and permissions
-- GitHub secrets for this repository
-
-Please see the [Repository Configuration Page](https://hashicorp.atlassian.net/wiki/spaces/VAULT/pages/2103476333/Repository+Configuration)
-for the setting proper repository configuration values.
 
 ## Quick Links
 
 - [Vault Website](https://www.vaultproject.io)
-- [Vault Project GitHub](https://www.github.com/hashicorp/vault)
+- [Plugin System](https://www.vaultproject.io/docs/plugins)
 
-[//]: <> (Include any other quick links relevant to your plugin)
 
 ## Getting Started
 
@@ -67,14 +27,17 @@ Otherwise, first read this guide on how to [get started with
 Vault](https://www.vaultproject.io/intro/getting-started/install.html).
 
 
-## Usage
-
-[//]: <> (Provide usage instructions and/or links to this plugin)
-
-## Developing
+## Development
 
 If you wish to work on this plugin, you'll first need
-[Go](https://www.golang.org) installed on your machine.
+[Go](https://www.golang.org) installed on your machine (version 1.17+ recommended)
+
+Make sure Go is properly installed, including setting up a [GOPATH](https://golang.org/doc/code.html#GOPATH).
+
+To run the tests locally you will need to have write permissions to an [ElastiCache for Redis](https://aws.amazon.com/elasticache/redis/) instance. 
+A small Terraform project is included to provision one for you if needed. More details in the [Environment Set Up](#environment-set-up) section.
+
+## Building
 
 If you're developing for the first time, run `make bootstrap` to install the
 necessary tools. Bootstrap will also update repository name references if that
@@ -91,6 +54,39 @@ mode will only generate the binary for your platform and is faster:
 ```sh
 $ make dev
 ```
+
+## Tests
+
+### Environment Set Up
+
+To test the plugin, you need access to an Elasticache for Redis Cluster. 
+A Terraform project is included for convenience to initialize a new cluster if needed.
+If not already available, you can install Terraform by using [this documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
+
+The setup script tries to find and use available AWS credentials from the environment. You can configure AWS credentials using [this documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
+Or if you prefer you can edit the provider defined ./bootstrap/terraform/elasticache.tf with your desired set of credentials.
+
+Note that resources created via the Terraform project cost a small amount of money per hour.
+
+To set up the test cluster:
+
+```sh
+$ make setup-env
+...
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+```
+
+### Environment Teardown
+
+The test cluster created via the setup-env command can be destroyed using the teardown-env command.
+
+```sh
+$ make teardown-env
+...
+Destroy complete! Resources: 4 destroyed.
+```
+
+### Testing Manually
 
 Put the plugin binary into a location of your choice. This directory
 will be specified as the [`plugin_directory`](https://www.vaultproject.io/docs/configuration#plugin_directory)
@@ -112,25 +108,62 @@ $ vault server -dev -config=path/to/config.hcl ...
 Once the server is started, register the plugin in the Vault server's [plugin catalog](https://www.vaultproject.io/docs/plugins/plugin-architecture#plugin-catalog):
 
 ```sh
-$ SHA256=$(openssl dgst -sha256 $GOPATH/vault-plugin-secrets-myplugin | cut -d ' ' -f2)
-$ vault plugin register \
-        -sha256=$SHA256 \
-        -command="vault-plugin-secrets-myplugin" \
-        secrets myplugin
+$ SHA256=$(openssl dgst -sha256 $GOPATH/vault-plugin-database-redis-elasticache | cut -d ' ' -f2)
+$ vault plugin register -sha256=$SHA256 database vault-plugin-database-redis-elasticache
 ...
-Success! Data written to: sys/plugins/catalog/myplugin
+Success! Data written to: sys/plugins/catalog/database/vault-plugin-database-redis-elasticache
 ```
 
-Enable the secrets engine to use this plugin:
+Enable the database engine to use this plugin:
 
 ```sh
-$ vault secrets enable myplugin
+$ vault secrets enable database
 ...
 
-Successfully enabled 'plugin' at 'myplugin'!
+Success! Enabled the database secrets engine at: database/
 ```
 
-### Tests
+Once the database engine is enabled you can configure an ElastiCache instance:
+
+```sh
+$ vault write database/config/redis-mydb \
+        plugin_name="vault-plugin-database-redis-elasticache" \
+        username=$USERNAME \
+        password=$PASSWORD \
+        url=$URL \
+        region=$REGION
+...
+
+Success! Data written to: database/config/redis-mydb
+```
+
+Configure a static role:
+
+```sh
+$ vault write database/static-roles/redis-myrole \
+        db_name="redis-mydb" \
+        username="my-elasticache-username" \
+        rotation_period=5m
+...
+
+Success! Data written to: database/roles/redis-myrole
+```
+
+Retrieve your first set of static credentials:
+
+```sh
+$ vault read database/static-creds/redis-myrole
+Key                    Value
+---                    -----
+last_vault_rotation    2022-09-06T12:15:33.958413491-04:00
+password               PASSWORD
+rotation_period        5m
+ttl                    4m55s
+username               my-elasticache-username
+```
+
+
+### Automated Tests
 
 To run the tests, invoke `make test`:
 
@@ -144,4 +177,25 @@ You can also specify a `TESTARGS` variable to filter tests like so:
 $ make test TESTARGS='-run=TestConfig'
 ```
 
-[//]: <> (Specify any other test instructions such as acceptance/integration tests)
+### Acceptance Tests
+
+The majority of tests must communicate with an existing ElastiCache instance. See the [Environment Set Up](#environment-set-up) section for instructions on how to prepare a test cluster.
+
+Some environment variables are required to run tests expecting to communicate with an ElastiCache cluster. 
+The username and password should be valid IAM access key and secret key with read and write access to the ElastiCache cluster used for testing. The URL should be the complete configuration endpoint including the port, for example: `vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379`.
+
+```sh
+$ export TEST_ELASTICACHE_USERNAME="AWS ACCESS KEY ID"
+$ export TEST_ELASTICACHE_PASSWORD="AWS SECRET ACCESS KEY"
+$ export TEST_ELASTICACHE_URL="vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379"
+$ export TEST_ELASTICACHE_REGION="us-east-1"
+$ export TEST_ELASTICACHE_USER="vault-test"
+
+$ make test
+```
+
+You can also specify a `TESTARGS` variable to filter tests like so:
+
+```sh
+$ make test TESTARGS='-run=TestConfig'
+```
