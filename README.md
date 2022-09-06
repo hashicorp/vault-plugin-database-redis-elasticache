@@ -189,6 +189,7 @@ $ export TEST_ELASTICACHE_USERNAME="AWS ACCESS KEY ID"
 $ export TEST_ELASTICACHE_PASSWORD="AWS SECRET ACCESS KEY"
 $ export TEST_ELASTICACHE_URL="vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379"
 $ export TEST_ELASTICACHE_REGION="us-east-1"
+$ export TEST_ELASTICACHE_USER="vault-test"
 
 $ make test
 ```

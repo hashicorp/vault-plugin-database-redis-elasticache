@@ -3,8 +3,6 @@ package rediselasticache
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticache"
@@ -108,22 +106,4 @@ func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUs
 	}
 
 	return dbplugin.UpdateUserResponse{}, nil
-}
-
-func (r *redisElastiCacheDB) waitForUserActiveState(userId string) bool {
-	isActive := false
-
-	for i := 0; i <= 50; i++ {
-		user, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{
-			UserId: aws.String(userId),
-		})
-		if err != nil && len(user.Users) == 1 && *user.Users[0].Status == "active" {
-			isActive = true
-			break
-		} else {
-			time.Sleep(3 * time.Second)
-		}
-	}
-
-	return isActive
 }

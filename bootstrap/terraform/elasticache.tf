@@ -64,35 +64,10 @@ data "aws_iam_policy_document" "vault_plugin_elasticache_test" {
   statement {
     actions = [
       "elasticache:DescribeUsers",
-      "elasticache:CreateUser",
       "elasticache:ModifyUser",
-      "elasticache:DeleteUser",
     ]
     resources = [
-      "arn:aws:elasticache:*:*:user:*",
-    ]
-  }
-
-  statement {
-    actions = [
-      "elasticache:DescribeUserGroups",
-      "elasticache:CreateUserGroup",
-      "elasticache:ModifyUserGroup",
-      "elasticache:DeleteUserGroup",
-      "elasticache:ModifyReplicationGroup",
-    ]
-    resources = [
-      "arn:aws:elasticache:*:*:usergroup:*",
-    ]
-  }
-
-  statement {
-    actions = [
-      "elasticache:DescribeReplicationGroups",
-      "elasticache:ModifyReplicationGroup",
-    ]
-    resources = [
-      "arn:aws:elasticache:*:*:replicationgroup:*",
+      "arn:aws:elasticache:*.*:user:*",
     ]
   }
 }
