@@ -3,4 +3,6 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    reviewers:
+      - maxcoulombe
