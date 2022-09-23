@@ -2,6 +2,7 @@ package rediselasticache
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -30,9 +31,9 @@ type testCases []struct {
 	wantErr bool
 }
 
-func skipIfEnvIsUnset(t *testing.T, config config, username string) {
-	if config.Username == "" || config.Password == "" || config.Url == "" || config.Region == "" || username == "" {
-		t.Skip("Skipping acceptance tests because required environment variables are not configured")
+func skipIfAccTestNotEnabled(t *testing.T) {
+	if _, ok := os.LookupEnv("ACC_TEST_ENABLED"); !ok {
+		t.Skip(fmt.Printf("Skipping accpetance test %s; ACC_TEST_ENABLED is not set.", t.Name()))
 	}
 }
 
@@ -85,8 +86,8 @@ func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interfac
 }
 
 func Test_redisElastiCacheDB_Initialize(t *testing.T) {
-	f, c, r, u := setUpEnvironment()
-	skipIfEnvIsUnset(t, f.config, u)
+	f, c, r, _ := setUpEnvironment()
+	skipIfAccTestNotEnabled(t)
 
 	tests := testCases{
 		{
@@ -138,7 +139,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 func Test_redisElastiCacheDB_UpdateUser(t *testing.T) {
 	f, c, r, u := setUpEnvironment()
 
-	skipIfEnvIsUnset(t, f.config, u)
+	skipIfAccTestNotEnabled(t)
 	setUpClient(t, &r, c)
 
 	tests := testCases{

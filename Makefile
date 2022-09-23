@@ -1,8 +1,5 @@
-# Determine this makefile's path.
-# Be sure to place this BEFORE `include` directives, if any.
-REPO_DIR := $(shell basename $(CURDIR))
-
 PLUGIN_NAME := $(shell command ls cmd/)
+PLUGIN_DIR := $(HOME)/vault-plugins
 
 .PHONY: default
 default: dev
@@ -11,24 +8,13 @@ default: dev
 dev:
 	CGO_ENABLED=0 go build -o bin/$(PLUGIN_NAME) cmd/$(PLUGIN_NAME)/main.go
 
-# bootstrap the build by downloading additional tools
-.PHONY: bootstrap
-bootstrap:
-	@echo "Downloading tools ..."
-	@go generate -tags tools tools/tools.go
-	# This should only ever be performed once, so we lean on the cmd/ directory
-	# to indicate whether this has already been done.
-	@if [ "$(PLUGIN_NAME)" != "$(REPO_DIR)" ]; then \
-		echo "Renaming cmd/$(PLUGIN_NAME) to cmd/$(REPO_DIR) ..."; \
-		mv cmd/$(PLUGIN_NAME) to cmd/$(REPO_DIR); \
-		echo "Renaming Go module to github.com/hashicorp/$(REPO_DIR) ..."; \
-        go mod edit -module github.com/hashicorp/$(REPO_DIR); \
-	fi
-
-
 .PHONY: test
-test: fmtcheck
-	CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
+test:
+	CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
+
+.PHONY: testacc
+testacc:
+	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
 
 .PHONY: fmtcheck
 fmtcheck:
@@ -46,3 +32,13 @@ setup-env:
 .PHONY: teardown-env
 teardown-env:
 	cd bootstrap/terraform && terraform init && terraform destroy -auto-approve
+
+.PHONY: configure
+configure: dev
+	@./bootstrap/configure.sh \
+	$(PLUGIN_DIR) \
+	$(PLUGIN_NAME) \
+	$(TEST_ELASTICACHE_URL) \
+	$(TEST_ELASTICACHE_REGION) \
+	$(TEST_ELASTICACHE_USERNAME) \
+	$(TEST_ELASTICACHE_PASSWORD)

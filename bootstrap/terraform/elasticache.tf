@@ -14,7 +14,7 @@ resource "random_password" "vault_plugin_elasticache_test" {
 resource "aws_elasticache_replication_group" "vault_plugin_elasticache_test" {
   replication_group_id       = "vault-plugin-elasticache-test"
   description                = "vault elasticache plugin generated test cluster"
-  engine                     = "REDIS"
+  engine                     = "redis"
   engine_version             = "6.2"
   node_type                  = "cache.t4g.micro"
   num_cache_clusters         = 1
@@ -67,38 +67,22 @@ data "aws_iam_policy_document" "vault_plugin_elasticache_test" {
       "elasticache:ModifyUser",
     ]
     resources = [
-      "arn:aws:elasticache:*.*:user:*",
+      "arn:aws:elasticache:*:*:user:*",
     ]
   }
 }
 
-// export TEST_ELASTICACHE_USERNAME=${username}
-output "username" {
-  value = aws_iam_access_key.vault_plugin_elasticache_test.id
-}
-
-// export TEST_ELASTICACHE_PASSWORD=${password}
-// Use `terraform output password` to access the value
-output "password" {
-  sensitive = true
-  value     = aws_iam_access_key.vault_plugin_elasticache_test.secret
-}
-
-// export TEST_ELASTICACHE_URL=${url}
-output "url" {
-  value = format(
-    "%s:%s",
-    aws_elasticache_replication_group.vault_plugin_elasticache_test.primary_endpoint_address,
-  aws_elasticache_replication_group.vault_plugin_elasticache_test.port)
-}
-
-// export TEST_ELASTICACHE_REGION=${region}
-data "aws_region" "current" {}
-output "region" {
-  value = data.aws_region.current.name
-}
-
-// export TEST_ELASTICACHE_USER=${user}
-output "user" {
-  value = aws_elasticache_user.vault_plugin_elasticache_test.user_name
+data aws_region "current" {}
+resource "local_file" "setup_environment_file" {
+  filename = "local_environment_setup.sh"
+  content = <<EOF
+export TEST_ELASTICACHE_USERNAME=${aws_iam_access_key.vault_plugin_elasticache_test.id} &&\
+export TEST_ELASTICACHE_PASSWORD=${aws_iam_access_key.vault_plugin_elasticache_test.secret} &&\
+export TEST_ELASTICACHE_URL=${format("%s:%s",
+  aws_elasticache_replication_group.vault_plugin_elasticache_test.primary_endpoint_address,
+aws_elasticache_replication_group.vault_plugin_elasticache_test.port)
+} &&\
+export TEST_ELASTICACHE_REGION=${data.aws_region.current.name} &&\
+export TEST_ELASTICACHE_USER=${aws_elasticache_user.vault_plugin_elasticache_test.user_name}
+EOF
 }
