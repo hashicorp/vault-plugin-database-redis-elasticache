@@ -38,8 +38,8 @@ func skipIfAccTestNotEnabled(t *testing.T) {
 }
 
 func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, string) {
-	username := os.Getenv("TEST_ELASTICACHE_USERNAME")
-	password := os.Getenv("TEST_ELASTICACHE_PASSWORD")
+	accessKeyID := os.Getenv("TEST_ELASTICACHE_ACCESS_KEY_ID")
+	secretAccessKey := os.Getenv("TEST_ELASTICACHE_SECRET_ACCESS_KEY")
 	url := os.Getenv("TEST_ELASTICACHE_URL")
 	region := os.Getenv("TEST_ELASTICACHE_REGION")
 	user := os.Getenv("TEST_ELASTICACHE_USER")
@@ -51,19 +51,19 @@ func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, str
 			JSONFormat: true,
 		}),
 		config: config{
-			Username: username,
-			Password: password,
-			Url:      url,
-			Region:   region,
+			AccessKeyID:     accessKeyID,
+			SecretAccessKey: secretAccessKey,
+			Url:             url,
+			Region:          region,
 		},
 		client: nil,
 	}
 
 	c := map[string]interface{}{
-		"username": username,
-		"password": password,
-		"url":      url,
-		"region":   region,
+		"access_key_id":     accessKeyID,
+		"secret_access_key": secretAccessKey,
+		"url":               url,
+		"region":            region,
 	}
 
 	r := redisElastiCacheDB{
@@ -104,15 +104,33 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			},
 		},
 		{
+			name:   "initialize with deprecated attributes is valid",
+			fields: f,
+			args: args{
+				req: dbplugin.InitializeRequest{
+					Config: map[string]interface{}{
+						"access_key_id":     c["access_key_id"],
+						"secret_access_key": c["secret_access_key"],
+						"url":               c["url"],
+						"region":            c["region"],
+					},
+					VerifyConnection: true,
+				},
+			},
+			want: dbplugin.InitializeResponse{
+				Config: c,
+			},
+		},
+		{
 			name:   "initialize with invalid config fails",
 			fields: f,
 			args: args{
 				req: dbplugin.InitializeRequest{
 					Config: map[string]interface{}{
-						"username": "wrong",
-						"password": "wrong",
-						"url":      "wrong",
-						"region":   "wrong",
+						"access_key_id":     "wrong",
+						"secret_access_key": "wrong",
+						"url":               "wrong",
+						"region":            "wrong",
 					},
 					VerifyConnection: true,
 				},

@@ -3,8 +3,8 @@ PLUGIN_NAME=$2
 
 TEST_ELASTICACHE_URL=$3
 TEST_ELASTICACHE_REGION=$4
-TEST_ELASTICACHE_USERNAME=$5
-TEST_ELASTICACHE_PASSWORD=$6
+$TEST_ELASTICACHE_ACCESS_KEY_ID=$5
+$TEST_ELASTICACHE_SECRET_ACCESS_KEY=$6
 
 vault plugin deregister "$PLUGIN_NAME"
 vault secrets disable database
@@ -22,5 +22,5 @@ vault write database/config/local-redis plugin_name="$PLUGIN_NAME" \
     	allowed_roles="*" \
     	url="$TEST_ELASTICACHE_URL" \
     	region="$TEST_ELASTICACHE_REGION" \
-    	username="$TEST_ELASTICACHE_USERNAME" \
-    	password="$TEST_ELASTICACHE_PASSWORD"
+    	access_key_id="$TEST_ELASTICACHE_ACCESS_KEY_ID" \
+      secret_access_key="$TEST_ELASTICACHE_SECRET_ACCESS_KEY"
