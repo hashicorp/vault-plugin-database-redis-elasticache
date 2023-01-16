@@ -23,4 +23,4 @@ vault write database/config/local-redis plugin_name="$PLUGIN_NAME" \
     	url="$TEST_ELASTICACHE_URL" \
     	region="$TEST_ELASTICACHE_REGION" \
     	access_key_id="$TEST_ELASTICACHE_ACCESS_KEY_ID" \
-      secret_access_key="$TEST_ELASTICACHE_SECRET_ACCESS_KEY"
+    	secret_access_key="$TEST_ELASTICACHE_SECRET_ACCESS_KEY"

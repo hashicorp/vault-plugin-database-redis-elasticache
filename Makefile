@@ -14,7 +14,7 @@ test:
 
 .PHONY: testacc
 testacc:
-	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
+	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
 
 .PHONY: fmtcheck
 fmtcheck:
