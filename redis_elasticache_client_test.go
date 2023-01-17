@@ -89,6 +89,13 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 	f, c, r, _ := setUpEnvironment()
 	skipIfAccTestNotEnabled(t)
 
+	configWithDeprecatedFields := map[string]interface{}{
+		"username": c["access_key_id"],
+		"password": c["secret_access_key"],
+		"url":      c["url"],
+		"region":   c["region"],
+	}
+
 	tests := testCases{
 		{
 			name:   "initialize and verify connection succeeds",
@@ -108,17 +115,12 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			fields: f,
 			args: args{
 				req: dbplugin.InitializeRequest{
-					Config: map[string]interface{}{
-						"access_key_id":     c["access_key_id"],
-						"secret_access_key": c["secret_access_key"],
-						"url":               c["url"],
-						"region":            c["region"],
-					},
+					Config:           configWithDeprecatedFields,
 					VerifyConnection: true,
 				},
 			},
 			want: dbplugin.InitializeResponse{
-				Config: c,
+				Config: configWithDeprecatedFields,
 			},
 		},
 		{
