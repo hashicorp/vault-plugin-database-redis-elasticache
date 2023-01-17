@@ -1,5 +1,5 @@
 PLUGIN_NAME := $(shell command ls cmd/)
-PLUGIN_DIR := $(HOME)/vault-plugins
+PLUGIN_DIR := $(GOPATH)/vault-plugins
 
 .PHONY: default
 default: dev
@@ -14,7 +14,7 @@ test:
 
 .PHONY: testacc
 testacc:
-	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
+	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
 
 .PHONY: fmtcheck
 fmtcheck:
@@ -28,7 +28,6 @@ fmt:
 setup-env:
 	cd bootstrap/terraform && terraform init && terraform apply -auto-approve
 
-
 .PHONY: teardown-env
 teardown-env:
 	cd bootstrap/terraform && terraform init && terraform destroy -auto-approve
@@ -40,5 +39,5 @@ configure: dev
 	$(PLUGIN_NAME) \
 	$(TEST_ELASTICACHE_URL) \
 	$(TEST_ELASTICACHE_REGION) \
-	$(TEST_ELASTICACHE_USERNAME) \
-	$(TEST_ELASTICACHE_PASSWORD)
+	$(TEST_ELASTICACHE_ACCESS_KEY_ID) \
+	$(TEST_ELASTICACHE_SECRET_ACCESS_KEY)

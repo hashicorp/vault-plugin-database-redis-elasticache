@@ -23,10 +23,13 @@ type redisElastiCacheDB struct {
 }
 
 type config struct {
-	Username string `mapstructure:"username,omitempty"`
-	Password string `mapstructure:"password,omitempty"`
-	Url      string `mapstructure:"url,omitempty"`
-	Region   string `mapstructure:"region,omitempty"`
+	AccessKeyID     string `mapstructure:"access_key_id,omitempty"`
+	SecretAccessKey string `mapstructure:"secret_access_key,omitempty"`
+	Url             string `mapstructure:"url,omitempty"`
+	Region          string `mapstructure:"region,omitempty"`
+
+	Username string `mapstructure:"username,omitempty"` // @Deprecated, use AccessKeyID instead
+	Password string `mapstructure:"password,omitempty"` // @Deprecated, use SecretAccessKey instead
 }
 
 func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.InitializeRequest) (dbplugin.InitializeResponse, error) {
@@ -36,7 +39,17 @@ func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.Initiali
 		return dbplugin.InitializeResponse{}, err
 	}
 
-	creds, err := awsutil.RetrieveCreds(r.config.Username, r.config.Password, "", r.logger)
+	// If primary connection attributes are not set, try to fall back on the deprecated values for backward compatibility
+	accessKey := r.config.AccessKeyID
+	if accessKey == "" && r.config.Username != "" {
+		accessKey = r.config.Username
+	}
+	secretKey := r.config.SecretAccessKey
+	if secretKey == "" && r.config.SecretAccessKey != "" {
+		secretKey = r.config.SecretAccessKey
+	}
+
+	creds, err := awsutil.RetrieveCreds(accessKey, secretKey, "", r.logger)
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to rerieve AWS credentials from provider chain: %w", err)
 	}

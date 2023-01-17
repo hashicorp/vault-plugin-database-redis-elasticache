@@ -72,12 +72,12 @@ data "aws_iam_policy_document" "vault_plugin_elasticache_test" {
   }
 }
 
-data aws_region "current" {}
+data "aws_region" "current" {}
 resource "local_file" "setup_environment_file" {
   filename = "local_environment_setup.sh"
   content = <<EOF
-export TEST_ELASTICACHE_USERNAME=${aws_iam_access_key.vault_plugin_elasticache_test.id} &&\
-export TEST_ELASTICACHE_PASSWORD=${aws_iam_access_key.vault_plugin_elasticache_test.secret} &&\
+export TEST_ELASTICACHE_ACCESS_KEY_ID=${aws_iam_access_key.vault_plugin_elasticache_test.id} &&\
+export TEST_ELASTICACHE_SECRET_ACCESS_KEY=${aws_iam_access_key.vault_plugin_elasticache_test.secret} &&\
 export TEST_ELASTICACHE_URL=${format("%s:%s",
   aws_elasticache_replication_group.vault_plugin_elasticache_test.primary_endpoint_address,
 aws_elasticache_replication_group.vault_plugin_elasticache_test.port)
