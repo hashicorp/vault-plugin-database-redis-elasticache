@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 provider "aws" {
   // Credentials and configuration derived from the environment
   // Uncomment if you wish to configure the provider explicitly
