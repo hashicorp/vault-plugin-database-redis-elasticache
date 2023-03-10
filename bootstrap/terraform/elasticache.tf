@@ -20,35 +20,35 @@ resource "random_string" "suffix" {
   special          = false
 }
 
-# resource "aws_elasticache_replication_group" "vault_plugin_elasticache_test" {
-#   replication_group_id       = "vault-plugin-elasticache-test-${random_string.suffix.result}"
-#   description                = "vault elasticache plugin generated test cluster"
-#   engine                     = "redis"
-#   engine_version             = "6.2"
-#   node_type                  = "cache.t4g.micro"
-#   num_cache_clusters         = 1
-#   parameter_group_name       = "default.redis6.x"
-#   transit_encryption_enabled = true
-#   user_group_ids             = [aws_elasticache_user_group.vault_plugin_elasticache_test.id]
-#
-#   tags = {
-#     "description" : "vault elasticache plugin generated test cluster"
-#   }
-# }
-#
-# resource "aws_elasticache_user_group" "vault_plugin_elasticache_test" {
-#   engine        = "REDIS"
-#   user_group_id = "vault-test-user-group-${random_string.suffix.result}"
-#   user_ids      = ["default", aws_elasticache_user.vault_plugin_elasticache_test.user_id]
-# }
-#
-# resource "aws_elasticache_user" "vault_plugin_elasticache_test" {
-#   user_id       = "vault-test-${random_string.suffix.result}"
-#   user_name     = "vault-test-${random_string.suffix.result}"
-#   access_string = "on ~* +@all"
-#   engine        = "REDIS"
-#   passwords     = [random_password.vault_plugin_elasticache_test.result]
-# }
+resource "aws_elasticache_replication_group" "vault_plugin_elasticache_test" {
+  replication_group_id       = "vault-plugin-elasticache-test-${random_string.suffix.result}"
+  description                = "vault elasticache plugin generated test cluster"
+  engine                     = "redis"
+  engine_version             = "6.2"
+  node_type                  = "cache.t4g.micro"
+  num_cache_clusters         = 1
+  parameter_group_name       = "default.redis6.x"
+  transit_encryption_enabled = true
+  user_group_ids             = [aws_elasticache_user_group.vault_plugin_elasticache_test.id]
+
+  tags = {
+    "description" : "vault elasticache plugin generated test cluster"
+  }
+}
+
+resource "aws_elasticache_user_group" "vault_plugin_elasticache_test" {
+  engine        = "REDIS"
+  user_group_id = "vault-test-user-group-${random_string.suffix.result}"
+  user_ids      = ["default", aws_elasticache_user.vault_plugin_elasticache_test.user_id]
+}
+
+resource "aws_elasticache_user" "vault_plugin_elasticache_test" {
+  user_id       = "vault-test-${random_string.suffix.result}"
+  user_name     = "vault-test-${random_string.suffix.result}"
+  access_string = "on ~* +@all"
+  engine        = "REDIS"
+  passwords     = [random_password.vault_plugin_elasticache_test.result]
+}
 
 resource "aws_iam_user" "vault_plugin_elasticache_test" {
   name = "vault-plugin-elasticache-user-test-${random_string.suffix.result}"

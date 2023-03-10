@@ -4,18 +4,7 @@ PLUGIN_DIR := $(shell command ls bin/)
 .PHONY: default
 default: dev
 
-.PHONY: dev
-dev:
-	CGO_ENABLED=0 go build -o bin/$(PLUGIN_NAME) cmd/$(PLUGIN_NAME)/main.go
-
-.PHONY: test
-test:
-	CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
-
-.PHONY: testacc
-testacc:
-	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
-
+# Formatting
 .PHONY: fmtcheck
 fmtcheck:
 	@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
@@ -24,6 +13,21 @@ fmtcheck:
 fmt:
 	gofumpt -l -w . && cd bootstrap/terraform && terraform fmt
 
+# Build
+.PHONY: dev
+dev:
+	CGO_ENABLED=0 go build -o bin/$(PLUGIN_NAME) cmd/$(PLUGIN_NAME)/main.go
+
+# Tests
+.PHONY: test
+test:
+	CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
+
+.PHONY: testacc
+testacc:
+	ACC_TEST_ENABLED=1 CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
+
+# Setup test environment
 .PHONY: setup-env
 setup-env:
 	cd bootstrap/terraform && terraform init && terraform apply -auto-approve
