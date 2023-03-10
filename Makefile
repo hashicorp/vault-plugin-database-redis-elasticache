@@ -1,5 +1,5 @@
 PLUGIN_NAME := $(shell command ls cmd/)
-PLUGIN_DIR := $(GOPATH)/vault-plugins
+PLUGIN_DIR := $(shell command ls bin/)
 
 .PHONY: default
 default: dev

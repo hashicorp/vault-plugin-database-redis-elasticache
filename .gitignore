@@ -3,3 +3,7 @@
 .vscode
 pkg/*
 bin/*
+
+bootstrap/terraform/.terraform/*
+bootstrap/terraform/*.tfstate.*
+
