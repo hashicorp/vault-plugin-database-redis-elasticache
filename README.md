@@ -17,6 +17,13 @@ disclose by contacting us at [security@hashicorp.com](mailto:security@hashicorp.
 - [Plugin System](https://www.vaultproject.io/docs/plugins)
 
 
+## Compatibility
+
+The plugin is automatically available in Vault starting from [v1.12.0](https://developer.hashicorp.com/vault/docs/release-notes/1.12.0).
+If you are using a previous version of Vault, you can [build & register the binary yourself](https://developer.hashicorp.com/vault/docs/plugins/plugin-management)
+similar to how a custom external plugin operates.
+
+
 ## Getting Started
 
 This is a [Vault plugin](https://www.vaultproject.io/docs/plugins)
