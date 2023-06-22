@@ -48,13 +48,13 @@ func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.Initiali
 		accessKey = r.config.Username
 	}
 	secretKey := r.config.SecretAccessKey
-	if secretKey == "" && r.config.SecretAccessKey != "" {
-		secretKey = r.config.SecretAccessKey
+	if secretKey == "" && r.config.Password != "" {
+		secretKey = r.config.Password
 	}
 
 	creds, err := awsutil.RetrieveCreds(accessKey, secretKey, "", r.logger)
 	if err != nil {
-		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to rerieve AWS credentials from provider chain: %w", err)
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
 	}
 
 	region, err := awsutil.GetRegion(r.config.Region)

@@ -192,8 +192,8 @@ Some environment variables are required to run tests expecting to communicate wi
 The username and password should be valid IAM access key and secret key with read and write access to the ElastiCache cluster used for testing. The URL should be the complete configuration endpoint including the port, for example: `vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379`.
 
 ```sh
-$ export TEST_ELASTICACHE_USERNAME="AWS ACCESS KEY ID"
-$ export TEST_ELASTICACHE_PASSWORD="AWS SECRET ACCESS KEY"
+$ export TEST_ELASTICACHE_ACCESS_KEY_ID="AWS ACCESS KEY ID"
+$ export TEST_ELASTICACHE_SECRET_ACCESS_KEY="AWS SECRET ACCESS KEY"
 $ export TEST_ELASTICACHE_URL="vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379"
 $ export TEST_ELASTICACHE_REGION="us-east-1"
 $ export TEST_ELASTICACHE_USER="vault-test"

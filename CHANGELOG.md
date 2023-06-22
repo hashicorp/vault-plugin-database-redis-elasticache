@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* Fix bug when using deprecated password field to retrieve AWS credentials
+
 ## v0.2.1
 
 IMPROVEMENTS:
