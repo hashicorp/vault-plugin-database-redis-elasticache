@@ -198,11 +198,11 @@ $ export TEST_ELASTICACHE_URL="vault-plugin-elasticache-test.id.xxx.use1.cache.a
 $ export TEST_ELASTICACHE_REGION="us-east-1"
 $ export TEST_ELASTICACHE_USER="vault-test"
 
-$ make test
+$ make testacc
 ```
 
 You can also specify a `TESTARGS` variable to filter tests like so:
 
 ```sh
-$ make test TESTARGS='-run=TestConfig'
+$ make testacc TESTARGS='-run=TestConfig'
 ```
