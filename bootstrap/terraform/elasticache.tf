@@ -1,6 +1,16 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.67.0"
+    }
+  }
+}
+
 provider "aws" {
   // Credentials and configuration derived from the environment
   // Uncomment if you wish to configure the provider explicitly
@@ -8,6 +18,12 @@ provider "aws" {
   // access_key = ""
   // secret_key = ""
   // region = ""
+}
+
+variable "create_aws_user" {
+  description = "Whether to create an IAM user for the plugin to use"
+  default     = true
+  type        = bool
 }
 
 resource "random_password" "vault_plugin_elasticache_test" {
@@ -45,7 +61,8 @@ resource "aws_elasticache_user" "vault_plugin_elasticache_test" {
 }
 
 resource "aws_iam_user" "vault_plugin_elasticache_test" {
-  name = "vault-plugin-elasticache-user-test"
+  count = var.create_aws_user ? 1 : 0
+  name  = "vault-plugin-elasticache-user-test"
 
   tags = {
     "description" : "vault elasticache plugin generated test user"
@@ -53,12 +70,14 @@ resource "aws_iam_user" "vault_plugin_elasticache_test" {
 }
 
 resource "aws_iam_access_key" "vault_plugin_elasticache_test" {
-  user = aws_iam_user.vault_plugin_elasticache_test.name
+  count = var.create_aws_user ? 1 : 0
+  user  = aws_iam_user.vault_plugin_elasticache_test[0].name
 }
 
 resource "aws_iam_user_policy" "vault_plugin_elasticache_test" {
-  name = "vault-plugin-elasticache-policy-test"
-  user = aws_iam_user.vault_plugin_elasticache_test.name
+  count = var.create_aws_user ? 1 : 0
+  name  = "vault-plugin-elasticache-policy-test"
+  user  = aws_iam_user.vault_plugin_elasticache_test[0].name
 
   policy = data.aws_iam_policy_document.vault_plugin_elasticache_test.json
 }
@@ -79,8 +98,8 @@ data "aws_region" "current" {}
 resource "local_file" "setup_environment_file" {
   filename = "local_environment_setup.sh"
   content = <<EOF
-export TEST_ELASTICACHE_ACCESS_KEY_ID=${aws_iam_access_key.vault_plugin_elasticache_test.id} &&\
-export TEST_ELASTICACHE_SECRET_ACCESS_KEY=${aws_iam_access_key.vault_plugin_elasticache_test.secret} &&\
+export TEST_ELASTICACHE_ACCESS_KEY_ID=${var.create_aws_user ? aws_iam_access_key.vault_plugin_elasticache_test[0].id : ""} &&\
+export TEST_ELASTICACHE_SECRET_ACCESS_KEY=${var.create_aws_user ? aws_iam_access_key.vault_plugin_elasticache_test[0].secret : ""} &&\
 export TEST_ELASTICACHE_URL=${format("%s:%s",
   aws_elasticache_replication_group.vault_plugin_elasticache_test.primary_endpoint_address,
 aws_elasticache_replication_group.vault_plugin_elasticache_test.port)
