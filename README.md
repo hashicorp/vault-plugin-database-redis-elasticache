@@ -83,6 +83,15 @@ $ make setup-env
 Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 ```
 
+Set the `create_aws_user` variable to `false` to skip creating an IAM user for
+plugin management:
+
+```sh
+$ make setup-env TF_VAR_create_aws_user=false
+...
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+```
+
 ### Environment Teardown
 
 The test cluster created via the setup-env command can be destroyed using the teardown-env command.
@@ -188,8 +197,9 @@ $ make test TESTARGS='-run=TestConfig'
 
 The majority of tests must communicate with an existing ElastiCache instance. See the [Environment Set Up](#environment-set-up) section for instructions on how to prepare a test cluster.
 
-Some environment variables are required to run tests expecting to communicate with an ElastiCache cluster. 
-The username and password should be valid IAM access key and secret key with read and write access to the ElastiCache cluster used for testing. The URL should be the complete configuration endpoint including the port, for example: `vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379`.
+Some environment variables are required to run tests expecting to communicate with an ElastiCache cluster.
+The username and password should be valid IAM access key and secret key with read and write access to the ElastiCache cluster used for testing. They may also be inferred from the usual `AWS_*` environment variables.
+The URL should be the complete configuration endpoint including the port, for example: `vault-plugin-elasticache-test.id.xxx.use1.cache.amazonaws.com:6379`.
 
 ```sh
 $ export TEST_ELASTICACHE_ACCESS_KEY_ID="AWS ACCESS KEY ID"
@@ -198,11 +208,11 @@ $ export TEST_ELASTICACHE_URL="vault-plugin-elasticache-test.id.xxx.use1.cache.a
 $ export TEST_ELASTICACHE_REGION="us-east-1"
 $ export TEST_ELASTICACHE_USER="vault-test"
 
-$ make test
+$ make testacc
 ```
 
 You can also specify a `TESTARGS` variable to filter tests like so:
 
 ```sh
-$ make test TESTARGS='-run=TestConfig'
+$ make testacc TESTARGS='-run=TestConfig'
 ```

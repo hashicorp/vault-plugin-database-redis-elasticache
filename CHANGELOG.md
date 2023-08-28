@@ -1,7 +1,16 @@
 ## Unreleased
 
+## v0.2.2
+### August 28, 2023
+
 IMPROVEMENTS:
-* Fix bug when using deprecated password field to retrieve AWS credentials
+* Updated dependencies:
+  * `github.com/aws/aws-sdk-go` v1.44.268 -> v1.44.331
+  * `github.com/hashicorp/go-secure-stdlib/awsutil` v0.2.2 -> v0.2.3
+  * `github.com/hashicorp/vault/sdk` v0.9.0 -> v0.9.2
+
+BUG FIXES:
+* Fix bug when using deprecated password field to retrieve AWS credentials [GH-53](https://github.com/hashicorp/vault-plugin-database-redis-elasticache/pull/53)
 
 ## v0.2.1
 
