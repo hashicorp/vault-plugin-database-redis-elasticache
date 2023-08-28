@@ -1,5 +1,15 @@
 ## Unreleased
 
+## v0.2.3
+### August 28, 2023
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `golang.org/x/crypto` v0.6.0 -> v0.12.0
+  * `golang.org/x/net` v0.8.0 -> v0.14.0
+  * `golang.org/x/sys` v0.6.0 -> v0.11.0
+  * `golang.org/x/text` v0.8.0 -> v0.12.0
+
 ## v0.2.2
 ### August 28, 2023
 
