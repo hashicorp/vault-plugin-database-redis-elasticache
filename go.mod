@@ -3,8 +3,8 @@ module github.com/hashicorp/vault-plugin-database-redis-elasticache
 go 1.20
 
 require (
-	github.com/aws/aws-sdk-go v1.47.0
-	github.com/hashicorp/go-hclog v1.5.0
+	github.com/aws/aws-sdk-go v1.49.13
+	github.com/hashicorp/go-hclog v1.6.2
 	github.com/hashicorp/go-secure-stdlib/awsutil v0.2.3
 	github.com/hashicorp/vault/sdk v0.10.2
 	github.com/mitchellh/mapstructure v1.5.0
