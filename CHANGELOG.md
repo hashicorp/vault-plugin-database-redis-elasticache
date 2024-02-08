@@ -1,5 +1,14 @@
 ## Unreleased
 
+## v0.3.0
+### February 8, 2024
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `github.com/aws/aws-sdk-go` v1.49.13 -> v1.50.13
+  * `github.com/hashicorp/go-secure-stdlib/awsutil` v0.2.3 -> v0.3.0
+  * `github.com/hashicorp/vault/sdk` v0.10.2 -> v0.11.0
+
 ## v0.2.3
 ### August 28, 2023
 
