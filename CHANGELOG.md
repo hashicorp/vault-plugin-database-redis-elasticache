@@ -1,5 +1,19 @@
 ## Unreleased
 
+## v0.4.0
+### May 20, 2024
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `github.com/aws/aws-sdk-go` v1.50.13 -> v1.53.5
+  * `github.com/hashicorp/go-hclog` v1.6.2 -> v1.6.3
+  * `github.com/hashicorp/vault/sdk` v0.11.0 -> v0.12.0
+  * `golang.org/x/crypto` v0.17.0 -> v0.21.0
+  * `golang.org/x/net` v0.17.0 -> v0.23.0
+  * `golang.org/x/sys` v0.15.0 -> v0.18.0
+  * `github.com/docker/docker` v24.0.7 -> v24.0.9
+  * `google.golang.org/protobuf` v1.31.0 -> v1.33.0
+
 ## v0.3.0
 ### February 8, 2024
 
