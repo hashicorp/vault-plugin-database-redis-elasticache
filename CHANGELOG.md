@@ -1,3 +1,14 @@
+## v0.8.0
+### October 2, 2025
+
+* Bump go version to 1.25.1 (#100)
+* [COMPLIANCE] Add Copyright and License Headers (#99)
+* Automated dependency upgrades (#93)
+* init changie (#98)
+* Add backport assistant workflow (#96)
+* Add backport assistant workflow (#95)
+* [Compliance] - PR Template Changes Required (#94)
+
 ## v0.7.0
 ### May 28, 2025
 
