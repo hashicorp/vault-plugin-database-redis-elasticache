@@ -1,3 +1,13 @@
+## v0.9.0
+### March 18, 2026
+* Bump go version to 1.26.1 (#107)
+* Updated dependencies (#107):
+  * github.com/hashicorp/vault/sdk v0.19.0 => v0.23.0
+  * golang.org/x/text v0.27.0 => v0.31.0
+  * golang.org/x/sys v0.34.0 => v0.38.0
+  * golang.org/x/crypto v0.40.0 => v0.45.0
+  * golang.org/x/net v0.42.0 => v0.47.0
+
 ## v0.8.0
 ### October 2, 2025
 
