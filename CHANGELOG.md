@@ -1,5 +1,13 @@
 ## v0.9.0
 ### March 18, 2026
+
+* prepare v0.9.0 release (#107)
+* [COMPLIANCE] Update Copyright and License Headers (#105)
+* chore: remove changie (#102)
+* Update changelog for v0.8.0 release (#101)
+
+## v0.9.0
+### March 18, 2026
 * Bump go version to 1.26.1 (#107)
 * Updated dependencies (#107):
   * github.com/hashicorp/vault/sdk v0.19.0 => v0.23.0
