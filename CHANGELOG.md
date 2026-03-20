@@ -1,3 +1,8 @@
+## v0.9.1
+### March 20, 2026
+
+* Automated dependency upgrades (#108)
+
 ## v0.9.0
 ### March 18, 2026
 * Bump go version to 1.26.1 (#107)
