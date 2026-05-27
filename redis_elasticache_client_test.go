@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
@@ -18,7 +18,7 @@ import (
 type fields struct {
 	logger hclog.Logger
 	config config
-	client *elasticache.ElastiCache
+	client *elasticache.Client
 }
 
 type args struct {
@@ -79,7 +79,7 @@ func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, str
 }
 
 func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interface{}) {
-	_, err := r.Initialize(nil, dbplugin.InitializeRequest{
+	_, err := r.Initialize(context.Background(), dbplugin.InitializeRequest{
 		Config:           config,
 		VerifyConnection: true,
 	})
@@ -104,6 +104,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			name:   "initialize and verify connection succeeds",
 			fields: f,
 			args: args{
+				ctx: context.Background(),
 				req: dbplugin.InitializeRequest{
 					Config:           c,
 					VerifyConnection: true,
@@ -117,6 +118,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			name:   "initialize with deprecated attributes is valid",
 			fields: f,
 			args: args{
+				ctx: context.Background(),
 				req: dbplugin.InitializeRequest{
 					Config:           configWithDeprecatedFields,
 					VerifyConnection: true,
@@ -130,6 +132,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			name:   "initialize with invalid config fails",
 			fields: f,
 			args: args{
+				ctx: context.Background(),
 				req: dbplugin.InitializeRequest{
 					Config: map[string]interface{}{
 						"access_key_id":     "wrong",

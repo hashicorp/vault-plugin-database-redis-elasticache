@@ -7,11 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-secure-stdlib/awsutil"
+	awsutil "github.com/hashicorp/go-secure-stdlib/awsutil/v2"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 	"github.com/mitchellh/mapstructure"
 )
@@ -22,7 +21,7 @@ var _ dbplugin.Database = (*redisElastiCacheDB)(nil)
 type redisElastiCacheDB struct {
 	logger hclog.Logger
 	config config
-	client *elasticache.ElastiCache
+	client *elasticache.Client
 }
 
 type config struct {
@@ -35,7 +34,7 @@ type config struct {
 	Password string `mapstructure:"password,omitempty"` // @Deprecated, use SecretAccessKey instead
 }
 
-func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.InitializeRequest) (dbplugin.InitializeResponse, error) {
+func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.InitializeRequest) (dbplugin.InitializeResponse, error) {
 	r.logger.Debug("initializing AWS ElastiCache Redis client")
 
 	if err := mapstructure.WeakDecode(req.Config, &r.config); err != nil {
@@ -52,29 +51,17 @@ func (r *redisElastiCacheDB) Initialize(_ context.Context, req dbplugin.Initiali
 		secretKey = r.config.Password
 	}
 
-	creds, err := awsutil.RetrieveCreds(accessKey, secretKey, "", r.logger)
+	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(r.config.Region))
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
 	}
 
-	region, err := awsutil.GetRegion(r.config.Region)
-	if err != nil {
-		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region from config nor context: %w", err)
-	}
-
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(region),
-		Credentials: creds,
-	})
-	if err != nil {
-		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to initialize AWS session: %w", err)
-	}
-	r.client = elasticache.New(sess)
+	r.client = elasticache.NewFromConfig(*cfg)
 
 	if req.VerifyConnection {
 		r.logger.Debug("Verifying connection to instance", "url", r.config.Url)
 
-		_, err := r.client.DescribeUsers(nil)
+		_, err := r.client.DescribeUsers(ctx, &elasticache.DescribeUsersInput{})
 		if err != nil {
 			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to connect to ElastiCache Redis endpoint: %w", err)
 		}
@@ -101,10 +88,10 @@ func (r *redisElastiCacheDB) DeleteUser(_ context.Context, _ dbplugin.DeleteUser
 	return dbplugin.DeleteUserResponse{}, fmt.Errorf("user deletion not supported")
 }
 
-func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUserRequest) (dbplugin.UpdateUserResponse, error) {
+func (r *redisElastiCacheDB) UpdateUser(ctx context.Context, req dbplugin.UpdateUserRequest) (dbplugin.UpdateUserResponse, error) {
 	r.logger.Debug("updating AWS ElastiCache Redis user", "username", req.Username)
 
-	out, err := r.client.DescribeUsers(&elasticache.DescribeUsersInput{
+	out, err := r.client.DescribeUsers(ctx, &elasticache.DescribeUsersInput{
 		UserId: aws.String(req.Username),
 	})
 	if err != nil {
@@ -114,9 +101,9 @@ func (r *redisElastiCacheDB) UpdateUser(_ context.Context, req dbplugin.UpdateUs
 		return dbplugin.UpdateUserResponse{}, fmt.Errorf("user %s cannot be updated because it is not in the 'active' state", req.Username)
 	}
 
-	_, err = r.client.ModifyUser(&elasticache.ModifyUserInput{
-		UserId:    &req.Username,
-		Passwords: []*string{&req.Password.NewPassword},
+	_, err = r.client.ModifyUser(ctx, &elasticache.ModifyUserInput{
+		UserId:    aws.String(req.Username),
+		Passwords: []string{req.Password.NewPassword},
 	})
 	if err != nil {
 		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to update user %s: %w", req.Username, err)
