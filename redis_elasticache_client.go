@@ -51,6 +51,9 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		secretKey = r.config.Password
 	}
 
+	// awsutil/v2 does not fall back to EC2 instance metadata (IMDS) for
+	// region resolution unlike awsutil v1. If region is not set here or via
+	// AWS_REGION / AWS_DEFAULT_REGION, it defaults to "us-east-1".
 	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(r.config.Region))
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
