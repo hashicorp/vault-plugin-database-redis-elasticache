@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	sdkconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/hashicorp/go-hclog"
 	awsutil "github.com/hashicorp/go-secure-stdlib/awsutil/v2"
@@ -51,10 +52,15 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		secretKey = r.config.Password
 	}
 
-	// awsutil/v2 does not fall back to EC2 instance metadata (IMDS) for
-	// region resolution unlike awsutil v1. If region is not set here or via
-	// AWS_REGION / AWS_DEFAULT_REGION, it defaults to "us-east-1".
-	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(r.config.Region))
+	region := r.config.Region
+	if region == "" {
+		// awsutil/v2 skips IMDS for region resolution. Use the SDK's own config
+		// loader to restore the full resolution chain: env vars → shared config → IMDS.
+		if defaultCfg, cfgErr := sdkconfig.LoadDefaultConfig(ctx); cfgErr == nil {
+			region = defaultCfg.Region
+		}
+	}
+	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(region))
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
 	}
