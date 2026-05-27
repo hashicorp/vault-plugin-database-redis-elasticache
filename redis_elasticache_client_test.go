@@ -5,7 +5,6 @@ package rediselasticache
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -35,8 +34,9 @@ type testCases []struct {
 }
 
 func skipIfAccTestNotEnabled(t *testing.T) {
+	t.Helper()
 	if _, ok := os.LookupEnv("ACC_TEST_ENABLED"); !ok {
-		t.Skip(fmt.Printf("Skipping accpetance test %s; ACC_TEST_ENABLED is not set.", t.Name()))
+		t.Skipf("Skipping acceptance test %s; ACC_TEST_ENABLED is not set.", t.Name())
 	}
 }
 
@@ -79,12 +79,13 @@ func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, str
 }
 
 func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interface{}) {
-	_, err := r.Initialize(context.Background(), dbplugin.InitializeRequest{
+	t.Helper()
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
 		Config:           config,
 		VerifyConnection: true,
 	})
 	if err != nil {
-		t.Errorf("unable to pre initialize redis client for test cases: %v", err)
+		t.Fatalf("unable to pre initialize redis client for test cases: %v", err)
 	}
 }
 
@@ -104,7 +105,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			name:   "initialize and verify connection succeeds",
 			fields: f,
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				req: dbplugin.InitializeRequest{
 					Config:           c,
 					VerifyConnection: true,
@@ -118,7 +119,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			name:   "initialize with deprecated attributes is valid",
 			fields: f,
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				req: dbplugin.InitializeRequest{
 					Config:           configWithDeprecatedFields,
 					VerifyConnection: true,
@@ -132,7 +133,7 @@ func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 			name:   "initialize with invalid config fails",
 			fields: f,
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				req: dbplugin.InitializeRequest{
 					Config: map[string]interface{}{
 						"access_key_id":     "wrong",
@@ -173,7 +174,7 @@ func Test_redisElastiCacheDB_UpdateUser(t *testing.T) {
 			name:   "update password of existing user succeeds",
 			fields: f,
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				req: dbplugin.UpdateUserRequest{
 					Username:       u,
 					CredentialType: 0,
@@ -188,7 +189,7 @@ func Test_redisElastiCacheDB_UpdateUser(t *testing.T) {
 			name:   "update password of non-existing user fails",
 			fields: f,
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				req: dbplugin.UpdateUserRequest{
 					Username:       "I do not exist",
 					CredentialType: 0,
@@ -204,7 +205,7 @@ func Test_redisElastiCacheDB_UpdateUser(t *testing.T) {
 			name:   "update to invalid password fails",
 			fields: f,
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 				req: dbplugin.UpdateUserRequest{
 					Username:       u,
 					CredentialType: 0,
