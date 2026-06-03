@@ -8,7 +8,9 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
@@ -43,6 +45,7 @@ func skipIfAccTestNotEnabled(t *testing.T) {
 func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, string) {
 	accessKeyID := os.Getenv("TEST_ELASTICACHE_ACCESS_KEY_ID")
 	secretAccessKey := os.Getenv("TEST_ELASTICACHE_SECRET_ACCESS_KEY")
+	sessionToken := os.Getenv("TEST_ELASTICACHE_SESSION_TOKEN")
 	url := os.Getenv("TEST_ELASTICACHE_URL")
 	region := os.Getenv("TEST_ELASTICACHE_REGION")
 	user := os.Getenv("TEST_ELASTICACHE_USER")
@@ -56,6 +59,7 @@ func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, str
 		config: config{
 			AccessKeyID:     accessKeyID,
 			SecretAccessKey: secretAccessKey,
+			SessionToken:    sessionToken,
 			Url:             url,
 			Region:          region,
 		},
@@ -65,6 +69,7 @@ func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, str
 	c := map[string]interface{}{
 		"access_key_id":     accessKeyID,
 		"secret_access_key": secretAccessKey,
+		"session_token":     sessionToken,
 		"url":               url,
 		"region":            region,
 	}
@@ -86,6 +91,27 @@ func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interfac
 	})
 	if err != nil {
 		t.Fatalf("unable to pre initialize redis client for test cases: %v", err)
+	}
+
+	// A prior test run may have left the test user in 'modifying' state.
+	// Poll until it is 'active' so the first UpdateUser sub-test starts clean.
+	user := os.Getenv("TEST_ELASTICACHE_USER")
+	if user == "" {
+		return
+	}
+	deadline := time.Now().Add(5 * time.Minute)
+	for {
+		out, err := r.client.DescribeUsers(t.Context(), &elasticache.DescribeUsersInput{
+			UserId: aws.String(user),
+		})
+		if err == nil && len(out.Users) == 1 && *out.Users[0].Status == "active" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("user %s did not reach 'active' state within 5 minutes", user)
+		}
+		t.Logf("waiting for user %s to become active before tests...", user)
+		time.Sleep(5 * time.Second)
 	}
 }
 

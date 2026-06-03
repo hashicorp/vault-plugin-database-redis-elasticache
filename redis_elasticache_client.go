@@ -28,6 +28,7 @@ type redisElastiCacheDB struct {
 type config struct {
 	AccessKeyID     string `mapstructure:"access_key_id,omitempty"`
 	SecretAccessKey string `mapstructure:"secret_access_key,omitempty"`
+	SessionToken    string `mapstructure:"session_token,omitempty"`
 	Url             string `mapstructure:"url,omitempty"`
 	Region          string `mapstructure:"region,omitempty"`
 
@@ -60,7 +61,7 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 			region = defaultCfg.Region
 		}
 	}
-	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(region))
+	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, r.config.SessionToken, r.logger, awsutil.WithRegion(region))
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
 	}
