@@ -106,7 +106,7 @@ func (r *redisElastiCacheDB) UpdateUser(ctx context.Context, req dbplugin.Update
 	if err != nil {
 		return dbplugin.UpdateUserResponse{}, fmt.Errorf("unable to get user %s: %w", req.Username, err)
 	}
-	if len(out.Users) == 1 && *out.Users[0].Status != "active" {
+	if len(out.Users) == 1 && aws.ToString(out.Users[0].Status) != "active" {
 		return dbplugin.UpdateUserResponse{}, fmt.Errorf("user %s cannot be updated because it is not in the 'active' state", req.Username)
 	}
 
