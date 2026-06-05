@@ -63,7 +63,8 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		region = defaultCfg.Region
 	}
 	if region == "" {
-		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region from config nor context")
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION)")
+	}
 	}
 	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger)
 	if err != nil {
