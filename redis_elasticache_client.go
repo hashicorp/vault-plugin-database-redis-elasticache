@@ -65,7 +65,6 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 	if region == "" {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION)")
 	}
-	}
 	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger)
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
