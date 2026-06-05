@@ -70,10 +70,9 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
 	}
 
-	// awsutil.RetrieveCreds does not propagate the WithRegion option to the
-	// returned aws.Config. Override cfg.Region explicitly so the ElastiCache
-	// client uses the region resolved above rather than any default set
-	// internally by the credential chain.
+	// awsutil.RetrieveCreds does not set Region on the returned aws.Config.
+	// Override it explicitly so the ElastiCache client resolves the correct
+	// regional endpoint.
 	cfg.Region = region
 
 	r.client = elasticache.NewFromConfig(*cfg)
