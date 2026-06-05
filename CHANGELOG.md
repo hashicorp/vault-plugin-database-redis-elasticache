@@ -1,6 +1,6 @@
 ## Unreleased
 
-* Migrate AWS client from `aws-sdk-go` v1 to `aws-sdk-go-v2` ([VAULT-22272](https://hashicorp.atlassian.net/browse/VAULT-22272))
+* Migrate AWS client from `aws-sdk-go` v1 to `aws-sdk-go-v2` (#112)
 
 ## v0.9.1
 ### March 20, 2026
