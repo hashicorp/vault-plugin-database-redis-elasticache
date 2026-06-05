@@ -58,7 +58,7 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		// loader to restore the full resolution chain: env vars → shared config → IMDS.
 		defaultCfg, cfgErr := sdkconfig.LoadDefaultConfig(ctx)
 		if cfgErr != nil {
-			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region from config nor context: %w", cfgErr)
+			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION): %w", cfgErr)
 		}
 		region = defaultCfg.Region
 	}
