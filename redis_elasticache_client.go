@@ -58,6 +58,8 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		// loader to restore the full resolution chain: env vars → shared config → IMDS.
 		if defaultCfg, cfgErr := sdkconfig.LoadDefaultConfig(ctx); cfgErr == nil {
 			region = defaultCfg.Region
+		} else {
+			r.logger.Debug("failed to resolve region via SDK default config, proceeding with empty region", "error", cfgErr)
 		}
 	}
 	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(region))
