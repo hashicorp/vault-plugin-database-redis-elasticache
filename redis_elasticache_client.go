@@ -56,24 +56,25 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 	if region == "" {
 		// awsutil/v2 skips IMDS for region resolution. Use the SDK's own config
 		// loader to restore the full resolution chain: env vars → shared config → IMDS.
-		if defaultCfg, cfgErr := sdkconfig.LoadDefaultConfig(ctx); cfgErr == nil {
-			region = defaultCfg.Region
-		} else {
-			r.logger.Debug("failed to resolve region via SDK default config, proceeding with empty region", "error", cfgErr)
+		defaultCfg, cfgErr := sdkconfig.LoadDefaultConfig(ctx)
+		if cfgErr != nil {
+			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region from config nor context: %w", cfgErr)
 		}
+		region = defaultCfg.Region
 	}
-	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithRegion(region))
+	if region == "" {
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region from config nor context")
+	}
+	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger)
 	if err != nil {
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain: %w", err)
 	}
 
-	// awsutil.RetrieveCreds bypasses NewCredentialsConfig and does not propagate
-	// WithRegion to the returned aws.Config. Set the region explicitly so the
-	// ElastiCache client endpoint resolver always uses the operator-configured
-	// region rather than whatever the credential chain resolved independently.
-	if region != "" {
-		cfg.Region = region
-	}
+	// awsutil.RetrieveCreds does not propagate the WithRegion option to the
+	// returned aws.Config. Override cfg.Region explicitly so the ElastiCache
+	// client uses the region resolved above rather than any default set
+	// internally by the credential chain.
+	cfg.Region = region
 
 	r.client = elasticache.NewFromConfig(*cfg)
 
