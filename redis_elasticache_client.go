@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	sdkconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/hashicorp/go-hclog"
 	awsutil "github.com/hashicorp/go-secure-stdlib/awsutil/v2"
@@ -52,18 +51,11 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		secretKey = r.config.Password
 	}
 
-	region := r.config.Region
-	if region == "" {
-		// awsutil/v2 skips IMDS for region resolution. Use the SDK's own config
-		// loader to restore the full resolution chain: env vars → shared config → IMDS.
-		defaultCfg, cfgErr := sdkconfig.LoadDefaultConfig(ctx)
-		if cfgErr != nil {
-			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION): %w", cfgErr)
-		}
-		region = defaultCfg.Region
-	}
-	if region == "" {
-		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION)")
+	// awsutil.GetRegion follows the full resolution chain: plugin config → env vars
+	// (AWS_REGION/AWS_DEFAULT_REGION) → shared config → IMDS → "us-east-1" default.
+	region, regionErr := awsutil.GetRegion(ctx, r.config.Region)
+	if regionErr != nil {
+		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION): %w", regionErr)
 	}
 	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger)
 	if err != nil {
