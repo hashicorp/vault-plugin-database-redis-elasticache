@@ -75,7 +75,7 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 	r.client = elasticache.NewFromConfig(*cfg)
 
 	if req.VerifyConnection {
-		r.logger.Debug("Verifying connection to instance", "url", r.config.Url)
+		r.logger.Debug("Verifying credentials and region configuration via ElastiCache API")
 
 		_, err := r.client.DescribeUsers(ctx, &elasticache.DescribeUsersInput{})
 		if err != nil {
@@ -83,8 +83,8 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 			// traverse the chain and find url.Error, which DatabaseErrorSanitizerMiddleware
 			// replaces with a generic message. Using %s breaks the chain and keeps
 			// API-level errors (auth failures, bad endpoint) readable.
-			r.logger.Debug("connection verification failed", "url", r.config.Url, "error", err)
-			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to connect to ElastiCache Redis endpoint %q: %s", r.config.Url, err)
+			r.logger.Debug("ElastiCache API verification failed", "region", region, "error", err)
+			return dbplugin.InitializeResponse{}, fmt.Errorf("unable to verify ElastiCache API access (region %q): %s", region, err)
 		}
 	}
 
