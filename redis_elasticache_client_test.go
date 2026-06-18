@@ -5,11 +5,15 @@ package rediselasticache
 
 import (
 	"context"
+	"errors"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
@@ -17,7 +21,7 @@ import (
 type fields struct {
 	logger hclog.Logger
 	config config
-	client *elasticache.Client
+	client elastiCacheAPI
 }
 
 type args struct {
@@ -31,6 +35,22 @@ type testCases []struct {
 	args    args
 	want    interface{}
 	wantErr bool
+}
+
+// mockElastiCacheClient implements elastiCacheAPI for unit tests.
+type mockElastiCacheClient struct {
+	describeUsersOutput *elasticache.DescribeUsersOutput
+	describeUsersErr    error
+	modifyUserOutput    *elasticache.ModifyUserOutput
+	modifyUserErr       error
+}
+
+func (m *mockElastiCacheClient) DescribeUsers(_ context.Context, _ *elasticache.DescribeUsersInput, _ ...func(*elasticache.Options)) (*elasticache.DescribeUsersOutput, error) {
+	return m.describeUsersOutput, m.describeUsersErr
+}
+
+func (m *mockElastiCacheClient) ModifyUser(_ context.Context, _ *elasticache.ModifyUserInput, _ ...func(*elasticache.Options)) (*elasticache.ModifyUserOutput, error) {
+	return m.modifyUserOutput, m.modifyUserErr
 }
 
 func skipIfAccTestNotEnabled(t *testing.T) {
@@ -72,7 +92,7 @@ func setUpEnvironment() (fields, map[string]interface{}, redisElastiCacheDB, str
 	r := redisElastiCacheDB{
 		logger: f.logger,
 		config: f.config,
-		client: f.client,
+		client: nil,
 	}
 
 	return f, c, r, user
@@ -227,6 +247,88 @@ func Test_redisElastiCacheDB_UpdateUser(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("UpdateUser() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_redisElastiCacheDB_UpdateUser_errorPaths(t *testing.T) {
+	logger := hclog.NewNullLogger()
+
+	activeUser := []elasticachetypes.User{{Status: aws.String("active")}}
+	modifyingUser := []elasticachetypes.User{{Status: aws.String("modifying")}}
+
+	tests := []struct {
+		name    string
+		client  *mockElastiCacheClient
+		req     dbplugin.UpdateUserRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "DescribeUsers error returns formatted error",
+			client: &mockElastiCacheClient{
+				describeUsersErr: errors.New("api error InternalFailure"),
+			},
+			req: dbplugin.UpdateUserRequest{
+				Username: "testuser",
+				Password: &dbplugin.ChangePassword{NewPassword: "newpassword123"},
+			},
+			wantErr: true,
+			errMsg:  "unable to get user testuser",
+		},
+		{
+			name: "user not in active state returns error",
+			client: &mockElastiCacheClient{
+				describeUsersOutput: &elasticache.DescribeUsersOutput{Users: modifyingUser},
+			},
+			req: dbplugin.UpdateUserRequest{
+				Username: "testuser",
+				Password: &dbplugin.ChangePassword{NewPassword: "newpassword123"},
+			},
+			wantErr: true,
+			errMsg:  "not in the 'active' state",
+		},
+		{
+			name: "ModifyUser error returns formatted error",
+			client: &mockElastiCacheClient{
+				describeUsersOutput: &elasticache.DescribeUsersOutput{Users: activeUser},
+				modifyUserErr:       errors.New("InvalidPasswordException"),
+			},
+			req: dbplugin.UpdateUserRequest{
+				Username: "testuser",
+				Password: &dbplugin.ChangePassword{NewPassword: "newpassword123"},
+			},
+			wantErr: true,
+			errMsg:  "unable to update user testuser",
+		},
+		{
+			name: "success when user is active and ModifyUser succeeds",
+			client: &mockElastiCacheClient{
+				describeUsersOutput: &elasticache.DescribeUsersOutput{Users: activeUser},
+				modifyUserOutput:    &elasticache.ModifyUserOutput{},
+			},
+			req: dbplugin.UpdateUserRequest{
+				Username: "testuser",
+				Password: &dbplugin.ChangePassword{NewPassword: "newpassword123"},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &redisElastiCacheDB{
+				logger: logger,
+				client: tt.client,
+			}
+			_, err := r.UpdateUser(t.Context(), tt.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UpdateUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("UpdateUser() error = %q, want error containing %q", err.Error(), tt.errMsg)
 			}
 		})
 	}

@@ -15,13 +15,22 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// Verify interface is implemented
+// Verify interfaces are implemented
 var _ dbplugin.Database = (*redisElastiCacheDB)(nil)
+var _ elastiCacheAPI = (*elasticache.Client)(nil)
+
+// elastiCacheAPI covers the two ElastiCache operations used by this plugin.
+// AWS SDK v2 does not ship pre-generated iface packages; consumers define
+// their own narrow interfaces to keep call-site surface small and testable.
+type elastiCacheAPI interface {
+	DescribeUsers(ctx context.Context, params *elasticache.DescribeUsersInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeUsersOutput, error)
+	ModifyUser(ctx context.Context, params *elasticache.ModifyUserInput, optFns ...func(*elasticache.Options)) (*elasticache.ModifyUserOutput, error)
+}
 
 type redisElastiCacheDB struct {
 	logger hclog.Logger
 	config config
-	client *elasticache.Client
+	client elastiCacheAPI
 }
 
 type config struct {
