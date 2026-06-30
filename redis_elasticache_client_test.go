@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	"github.com/hashicorp/go-hclog"
+	awsutil "github.com/hashicorp/go-secure-stdlib/awsutil/v2"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
 
@@ -136,6 +137,15 @@ func Test_redisElastiCacheDB_Initialize_NoRegion(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Initialize() with no region should not fail: %v", err)
+	}
+
+	// Assert the client is configured with the documented fallback region.
+	ec, ok := r.client.(*elasticache.Client)
+	if !ok {
+		t.Fatal("expected client to be *elasticache.Client")
+	}
+	if got := ec.Options().Region; got != awsutil.DefaultRegion {
+		t.Fatalf("expected client region %q, got %q", awsutil.DefaultRegion, got)
 	}
 }
 
