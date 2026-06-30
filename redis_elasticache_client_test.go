@@ -109,6 +109,36 @@ func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interfac
 	}
 }
 
+// Test_redisElastiCacheDB_Initialize_NoRegion verifies that Initialize with no
+// region and verify_connection=false succeeds, matching the pre-v2 (v1 SDK)
+// behaviour where a missing region never hard-failed initialisation.
+func Test_redisElastiCacheDB_Initialize_NoRegion(t *testing.T) {
+	// Isolate from any ambient AWS configuration on the test machine or CI runner.
+	t.Setenv("AWS_REGION", "")
+	t.Setenv("AWS_DEFAULT_REGION", "")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"access_key_id":     "someaccesskey",
+		"secret_access_key": "somesecretkey",
+		"url":               "some-cache.abc.cfg.use1.cache.amazonaws.com",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with no region should not fail: %v", err)
+	}
+}
+
 func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 	f, c, r, _ := setUpEnvironment()
 	skipIfAccTestNotEnabled(t)
