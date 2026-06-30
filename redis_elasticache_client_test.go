@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	"github.com/hashicorp/go-hclog"
+	awsutil "github.com/hashicorp/go-secure-stdlib/awsutil/v2"
 	"github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 )
 
@@ -106,6 +107,45 @@ func setUpClient(t *testing.T, r *redisElastiCacheDB, config map[string]interfac
 	})
 	if err != nil {
 		t.Fatalf("unable to pre initialize redis client for test cases: %v", err)
+	}
+}
+
+// Test_redisElastiCacheDB_Initialize_NoRegion verifies that Initialize with no
+// region and verify_connection=false succeeds, matching the pre-v2 (v1 SDK)
+// behaviour where a missing region never hard-failed initialisation.
+func Test_redisElastiCacheDB_Initialize_NoRegion(t *testing.T) {
+	// Isolate from any ambient AWS configuration on the test machine or CI runner.
+	t.Setenv("AWS_REGION", "")
+	t.Setenv("AWS_DEFAULT_REGION", "")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"access_key_id":     "someaccesskey",
+		"secret_access_key": "somesecretkey",
+		"url":               "some-cache.abc.cfg.use1.cache.amazonaws.com",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with no region should not fail: %v", err)
+	}
+
+	// Assert the client is configured with the documented fallback region.
+	ec, ok := r.client.(*elasticache.Client)
+	if !ok {
+		t.Fatal("expected client to be *elasticache.Client")
+	}
+	if got := ec.Options().Region; got != awsutil.DefaultRegion {
+		t.Fatalf("expected client region %q, got %q", awsutil.DefaultRegion, got)
 	}
 }
 

@@ -60,13 +60,20 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 		secretKey = r.config.Password
 	}
 
-	// GetRegion checks plugin config, env vars (AWS_REGION/AWS_DEFAULT_REGION),
-	// then IMDS. Log full detail at debug; omit IMDS internals from the
-	// operator-facing error.
+	// GetRegion checks plugin config, env vars (AWS_REGION/AWS_DEFAULT_REGION), then
+	// IMDS. In non-EC2 environments IMDS is unavailable and GetRegion returns an error;
+	// fall back to DefaultRegion to preserve the v1 SDK contract where a missing region
+	// never hard-failed initialisation.
+	// TODO: remove this workaround once go-secure-stdlib/awsutil.GetRegion treats
+	// IMDS unavailability as non-fatal and falls through to DefaultRegion itself.
 	region, regionErr := awsutil.GetRegion(ctx, r.config.Region)
 	if regionErr != nil {
-		r.logger.Debug("region resolution failed", "error", regionErr)
-		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to determine AWS region (set plugin 'region' or AWS_REGION/AWS_DEFAULT_REGION)")
+		// Don't mask context cancellation or deadline as an IMDS failure.
+		if ctx.Err() != nil {
+			return dbplugin.InitializeResponse{}, ctx.Err()
+		}
+		region = awsutil.DefaultRegion
+		r.logger.Debug("region resolution failed, using default region", "region", region, "error", regionErr)
 	}
 	// RetrieveCreds can produce url.Error from network calls in the provider
 	// chain. Log full detail at debug; return a clean message to the operator.
