@@ -224,6 +224,18 @@ func Test_redisElastiCacheDB_Initialize_SharedCredentialsFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Initialize() with shared credentials file should not fail: %v", err)
 	}
+
+	ec, ok := r.client.(*elasticache.Client)
+	if !ok {
+		t.Fatal("expected client to be *elasticache.Client")
+	}
+	creds, err := ec.Options().Credentials.Retrieve(t.Context())
+	if err != nil {
+		t.Fatalf("failed to retrieve credentials from client: %v", err)
+	}
+	if creds.AccessKeyID != "someaccesskey" {
+		t.Fatalf("expected credentials from shared credentials file (AccessKeyID=%q), got %q", "someaccesskey", creds.AccessKeyID)
+	}
 }
 
 // Test_redisElastiCacheDB_Initialize_EnvVarCredentials verifies that Initialize
@@ -252,6 +264,18 @@ func Test_redisElastiCacheDB_Initialize_EnvVarCredentials(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Initialize() with env var credentials should not fail: %v", err)
+	}
+
+	ec, ok := r.client.(*elasticache.Client)
+	if !ok {
+		t.Fatal("expected client to be *elasticache.Client")
+	}
+	creds, err := ec.Options().Credentials.Retrieve(t.Context())
+	if err != nil {
+		t.Fatalf("failed to retrieve credentials from client: %v", err)
+	}
+	if creds.AccessKeyID != "envkeyid" {
+		t.Fatalf("expected credentials from env vars (AccessKeyID=%q), got %q", "envkeyid", creds.AccessKeyID)
 	}
 }
 
@@ -295,6 +319,10 @@ func Test_redisElastiCacheDB_Initialize_NoCredentials(t *testing.T) {
 	t.Setenv("AWS_DEFAULT_REGION", "")
 	t.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", "")
 	t.Setenv("AWS_ROLE_ARN", "")
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
+	t.Setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "")
+	t.Setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
