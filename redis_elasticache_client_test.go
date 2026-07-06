@@ -149,6 +149,214 @@ func Test_redisElastiCacheDB_Initialize_NoRegion(t *testing.T) {
 	}
 }
 
+// Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile verifies
+// that Initialize succeeds when explicit credentials are provided even when
+// ~/.aws/config contains a [default] profile. awsutil/v2 defaults
+// withSharedCredentials=true; when a [default] profile exists it adds
+// WithSharedConfigProfile("default") to the LoadDefaultConfig options, but also
+// passes an empty credentials file path, causing LoadDefaultConfig to fail with
+// "failed to get shared config profile, default". The fix passes
+// WithSharedCredentials(false) when explicit static keys are provided.
+func Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile(t *testing.T) {
+	// Write a temp AWS config file that contains a [default] profile — this is
+	// the environmental condition that triggered the bug.
+	configFile := t.TempDir() + "/config"
+	if err := os.WriteFile(configFile, []byte("[default]\nregion = us-west-2\n"), 0o600); err != nil {
+		t.Fatalf("failed to write temp AWS config file: %v", err)
+	}
+	t.Setenv("AWS_CONFIG_FILE", configFile)
+	// Point credentials file at a non-existent path — awsutil was passing an
+	// empty file path which caused LoadDefaultConfig to fail to find the profile.
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"access_key_id":     "someaccesskey",
+		"secret_access_key": "somesecretkey",
+		"url":               "some-cache.abc.cfg.use1.cache.amazonaws.com",
+		"region":            "us-east-1",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with explicit creds and [default] AWS profile should not fail: %v", err)
+	}
+}
+
+// Test_redisElastiCacheDB_Initialize_SharedCredentialsFile verifies that
+// Initialize succeeds when no explicit credentials are given and credentials
+// come from a shared credentials file (~/.aws/credentials). This exercises
+// the documented fallback: "If omitted, authentication falls back on the AWS
+// credentials provider chain."
+func Test_redisElastiCacheDB_Initialize_SharedCredentialsFile(t *testing.T) {
+	credsFile := t.TempDir() + "/credentials"
+	content := "[default]\naws_access_key_id = someaccesskey\naws_secret_access_key = somesecretkey\n"
+	if err := os.WriteFile(credsFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write temp credentials file: %v", err)
+	}
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", credsFile)
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"url":    "some-cache.abc.cfg.use1.cache.amazonaws.com",
+		"region": "us-east-1",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with shared credentials file should not fail: %v", err)
+	}
+}
+
+// Test_redisElastiCacheDB_Initialize_EnvVarCredentials verifies that Initialize
+// succeeds when no explicit credentials are set in the plugin config but
+// AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are present in the environment.
+// This exercises the SDK default credential chain path (accessKey == "").
+func Test_redisElastiCacheDB_Initialize_EnvVarCredentials(t *testing.T) {
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_ACCESS_KEY_ID", "envkeyid")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "envsecretkey")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"url":    "some-cache.abc.cfg.use1.cache.amazonaws.com",
+		"region": "us-east-1",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with env var credentials should not fail: %v", err)
+	}
+}
+
+// Test_redisElastiCacheDB_Initialize_DeprecatedCredentials verifies that the
+// deprecated username/password fields fall back correctly when access_key_id and
+// secret_access_key are absent.
+func Test_redisElastiCacheDB_Initialize_DeprecatedCredentials(t *testing.T) {
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"username": "someaccesskey",
+		"password": "somesecretkey",
+		"url":      "some-cache.abc.cfg.use1.cache.amazonaws.com",
+		"region":   "us-east-1",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with deprecated username/password should not fail: %v", err)
+	}
+}
+
+// Test_redisElastiCacheDB_Initialize_NoCredentials verifies that Initialize fails
+// with a clear error when no credentials are available from any source.
+func Test_redisElastiCacheDB_Initialize_NoCredentials(t *testing.T) {
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_REGION", "")
+	t.Setenv("AWS_DEFAULT_REGION", "")
+	t.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", "")
+	t.Setenv("AWS_ROLE_ARN", "")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"url":    "some-cache.abc.cfg.use1.cache.amazonaws.com",
+		"region": "us-east-1",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err == nil {
+		t.Fatal("Initialize() with no credentials should fail")
+	}
+	if !strings.Contains(err.Error(), "unable to retrieve AWS credentials from provider chain") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+// Test_redisElastiCacheDB_Initialize_StaticCredsOverrideSharedCredentialsFile
+// verifies that when both a real AWS credentials file and explicit static keys
+// in the plugin config are present, the static keys win. This covers the exact
+// scenario reported as a bug: providing ./aws/credentials alongside
+// access_key_id / secret_access_key in the database configuration.
+// awsutil.WithSharedCredentials(false) prevents the SDK's credentials-file
+// provider from interfering with the explicit static-credentials provider.
+func Test_redisElastiCacheDB_Initialize_StaticCredsOverrideSharedCredentialsFile(t *testing.T) {
+	// Write a credentials file with a [default] profile using DIFFERENT keys to
+	// make it visible if they are accidentally used instead of the static keys.
+	credsFile := t.TempDir() + "/credentials"
+	content := "[default]\naws_access_key_id = fileaccesskey\naws_secret_access_key = filesecretkey\n"
+	if err := os.WriteFile(credsFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write temp credentials file: %v", err)
+	}
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", credsFile)
+	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+
+	r := &redisElastiCacheDB{
+		logger: hclog.NewNullLogger(),
+	}
+
+	cfg := map[string]interface{}{
+		"access_key_id":     "staticaccesskey",
+		"secret_access_key": "staticsecretkey",
+		"url":               "some-cache.abc.cfg.use1.cache.amazonaws.com",
+		"region":            "us-east-1",
+	}
+
+	_, err := r.Initialize(t.Context(), dbplugin.InitializeRequest{
+		Config:           cfg,
+		VerifyConnection: false,
+	})
+	if err != nil {
+		t.Fatalf("Initialize() with static creds and a credentials file should not fail: %v", err)
+	}
+}
+
 func Test_redisElastiCacheDB_Initialize(t *testing.T) {
 	f, c, r, _ := setUpEnvironment()
 	skipIfAccTestNotEnabled(t)
