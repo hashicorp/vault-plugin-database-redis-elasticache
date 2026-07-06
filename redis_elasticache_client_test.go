@@ -150,13 +150,13 @@ func Test_redisElastiCacheDB_Initialize_NoRegion(t *testing.T) {
 }
 
 // Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile verifies
-// that Initialize succeeds when explicit credentials are provided even when
-// ~/.aws/config contains a [default] profile. awsutil/v2 defaults
-// withSharedCredentials=true; when a [default] profile exists it adds
-// WithSharedConfigProfile("default") to the LoadDefaultConfig options, but also
-// passes an empty credentials file path, causing LoadDefaultConfig to fail with
-// "failed to get shared config profile, default". The fix passes
-// WithSharedCredentials(false) when explicit static keys are provided.
+// that Initialize succeeds when explicit credentials are provided alongside a
+// [default] profile in ~/.aws/config. awsutil/v2 defaults
+// withSharedCredentials=true, which injects an empty WithSharedCredentialsFiles("")
+// override; when a [default] profile also exists, LoadDefaultConfig fails with
+// "failed to get shared config profile, default". Passing
+// WithSharedCredentials(false) unconditionally prevents this interference and
+// lets the SDK run its own credential chain without a double-probe.
 func Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile(t *testing.T) {
 	// Write a temp AWS config file that contains a [default] profile — this is
 	// the environmental condition that triggered the bug.
