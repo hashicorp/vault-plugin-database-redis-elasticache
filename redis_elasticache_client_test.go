@@ -173,6 +173,8 @@ func Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile(t *te
 	t.Setenv("AWS_ACCESS_KEY_ID", "")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
 	t.Setenv("AWS_SESSION_TOKEN", "")
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
@@ -222,6 +224,8 @@ func Test_redisElastiCacheDB_Initialize_SharedCredentialsFile(t *testing.T) {
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 	t.Setenv("AWS_ACCESS_KEY_ID", "")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
@@ -263,6 +267,8 @@ func Test_redisElastiCacheDB_Initialize_EnvVarCredentials(t *testing.T) {
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 	t.Setenv("AWS_ACCESS_KEY_ID", "envkeyid")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "envsecretkey")
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
@@ -301,6 +307,8 @@ func Test_redisElastiCacheDB_Initialize_DeprecatedCredentials(t *testing.T) {
 	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/nonexistent")
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
@@ -365,8 +373,9 @@ func Test_redisElastiCacheDB_Initialize_NoCredentials(t *testing.T) {
 // in the plugin config are present, the static keys win. This covers the exact
 // scenario reported as a bug: providing ~/.aws/credentials alongside
 // access_key_id / secret_access_key in the database configuration.
-// awsutil.WithSharedCredentials(false) prevents the SDK's credentials-file
-// provider from interfering with the explicit static-credentials provider.
+// awsutil.WithSharedCredentials(false) prevents awsutil from injecting an empty
+// WithSharedCredentialsFiles("") override into LoadDefaultConfig, letting the
+// SDK run its own default credential chain without interference.
 func Test_redisElastiCacheDB_Initialize_StaticCredsOverrideSharedCredentialsFile(t *testing.T) {
 	// Write a credentials file with a [default] profile using DIFFERENT keys to
 	// make it visible if they are accidentally used instead of the static keys.
@@ -380,6 +389,8 @@ func Test_redisElastiCacheDB_Initialize_StaticCredsOverrideSharedCredentialsFile
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 	t.Setenv("AWS_ACCESS_KEY_ID", "")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_DEFAULT_PROFILE", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
