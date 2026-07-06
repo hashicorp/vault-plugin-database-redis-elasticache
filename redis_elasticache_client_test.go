@@ -319,7 +319,7 @@ func Test_redisElastiCacheDB_Initialize_NoCredentials(t *testing.T) {
 // Test_redisElastiCacheDB_Initialize_StaticCredsOverrideSharedCredentialsFile
 // verifies that when both a real AWS credentials file and explicit static keys
 // in the plugin config are present, the static keys win. This covers the exact
-// scenario reported as a bug: providing ./aws/credentials alongside
+// scenario reported as a bug: providing ~/.aws/credentials alongside
 // access_key_id / secret_access_key in the database configuration.
 // awsutil.WithSharedCredentials(false) prevents the SDK's credentials-file
 // provider from interfering with the explicit static-credentials provider.
@@ -354,6 +354,18 @@ func Test_redisElastiCacheDB_Initialize_StaticCredsOverrideSharedCredentialsFile
 	})
 	if err != nil {
 		t.Fatalf("Initialize() with static creds and a credentials file should not fail: %v", err)
+	}
+
+	ec, ok := r.client.(*elasticache.Client)
+	if !ok {
+		t.Fatal("expected client to be *elasticache.Client")
+	}
+	creds, err := ec.Options().Credentials.Retrieve(t.Context())
+	if err != nil {
+		t.Fatalf("failed to retrieve credentials from client: %v", err)
+	}
+	if creds.AccessKeyID != "staticaccesskey" {
+		t.Fatalf("expected static credentials to take precedence (AccessKeyID=%q), got %q", "staticaccesskey", creds.AccessKeyID)
 	}
 }
 
