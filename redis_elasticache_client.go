@@ -78,8 +78,9 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 	// RetrieveCreds can produce url.Error from network calls in the provider
 	// chain. Log full detail at debug; return a clean message to the operator.
 	// awsutil/v2 defaults withSharedCredentials=true, which adds an empty
-	// WithSharedCredentialsFiles("") override that prevents LoadDefaultConfig
-	// from finding a [default] profile even when ~/.aws/credentials exists.
+	// WithSharedCredentialsFiles("") override; when a [default] profile exists,
+	// LoadDefaultConfig attempts to load that profile's credentials from the
+	// injected empty path and fails.
 	// Disabling it here lets LoadDefaultConfig run its own default chain
 	// (env vars → ~/.aws/credentials → ~/.aws/config → IMDS) without
 	// interference, whether or not explicit keys are provided.
