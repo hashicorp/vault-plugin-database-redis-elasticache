@@ -77,7 +77,14 @@ func (r *redisElastiCacheDB) Initialize(ctx context.Context, req dbplugin.Initia
 	}
 	// RetrieveCreds can produce url.Error from network calls in the provider
 	// chain. Log full detail at debug; return a clean message to the operator.
-	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger)
+	// awsutil/v2 defaults withSharedCredentials=true, which adds an empty
+	// WithSharedCredentialsFiles("") override; when a [default] profile exists,
+	// LoadDefaultConfig attempts to load that profile's credentials from the
+	// injected empty path and fails.
+	// Disabling it here lets LoadDefaultConfig run its own default chain
+	// (env vars → ~/.aws/credentials → ~/.aws/config → IMDS) without
+	// interference, whether or not explicit keys are provided.
+	cfg, err := awsutil.RetrieveCreds(ctx, accessKey, secretKey, "", r.logger, awsutil.WithSharedCredentials(false))
 	if err != nil {
 		r.logger.Debug("credential resolution failed", "error", err)
 		return dbplugin.InitializeResponse{}, fmt.Errorf("unable to retrieve AWS credentials from provider chain")
