@@ -170,6 +170,9 @@ func Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile(t *te
 	// profile's credentials from that empty path and fail.
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", t.TempDir()+"/nonexistent")
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_SESSION_TOKEN", "")
 
 	r := &redisElastiCacheDB{
 		logger: hclog.NewNullLogger(),
@@ -188,6 +191,18 @@ func Test_redisElastiCacheDB_Initialize_ExplicitCredsWithDefaultAWSProfile(t *te
 	})
 	if err != nil {
 		t.Fatalf("Initialize() with explicit creds and [default] AWS profile should not fail: %v", err)
+	}
+
+	ec, ok := r.client.(*elasticache.Client)
+	if !ok {
+		t.Fatal("expected client to be *elasticache.Client")
+	}
+	creds, err := ec.Options().Credentials.Retrieve(t.Context())
+	if err != nil {
+		t.Fatalf("failed to retrieve credentials from client: %v", err)
+	}
+	if creds.AccessKeyID != "someaccesskey" {
+		t.Fatalf("expected static credentials from plugin config (AccessKeyID=%q), got %q", "someaccesskey", creds.AccessKeyID)
 	}
 }
 
