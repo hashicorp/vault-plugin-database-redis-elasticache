@@ -6,10 +6,6 @@
 * fix(db/redis-elasticache): fix credential resolution when ~/.aws/credentials and static keys are both present (#114)
 * fix(db/redis-elasticache): restore backward-compatible region resolution after SDK v2 migration (#113)
 * Migrate AWS client from sdk-go v1 to sdk-go-v2 (#112)
-* Update changelog for v0.9.1 release (#109)
-
-## Unreleased
-
 * Migrate AWS client from `aws-sdk-go` v1 to `aws-sdk-go-v2` (#112)
 * Fix: restore backward-compatible region resolution — `Initialize` no longer errors when no region is configured and IMDS is unavailable; falls back to `us-east-1`, matching v1 SDK behaviour (#113)
 
