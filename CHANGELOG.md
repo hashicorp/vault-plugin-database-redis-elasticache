@@ -1,5 +1,11 @@
-## Unreleased
+## v0.10.0
+### September 11, 2026
 
+* chore: automated Go/dependency update via vault-plugin-release (#116)
+* bump up golang.org/x/crypto to v0.54.0 (#115)
+* fix(db/redis-elasticache): fix credential resolution when ~/.aws/credentials and static keys are both present (#114)
+* fix(db/redis-elasticache): restore backward-compatible region resolution after SDK v2 migration (#113)
+* Migrate AWS client from sdk-go v1 to sdk-go-v2 (#112)
 * Migrate AWS client from `aws-sdk-go` v1 to `aws-sdk-go-v2` (#112)
 * Fix: restore backward-compatible region resolution — `Initialize` no longer errors when no region is configured and IMDS is unavailable; falls back to `us-east-1`, matching v1 SDK behaviour (#113)
 
