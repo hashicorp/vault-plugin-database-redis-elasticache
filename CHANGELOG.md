@@ -1,3 +1,9 @@
+## v0.11.0
+### October 22, 2026
+
+* VAULT-50035: upgrade Go to 1.27.3 and fix vulnerable dependencies (#118)
+* [CHANGELOG] Prepare for v0.10.0 release (#117)
+
 ## v0.10.0
 ### September 11, 2026
 
